@@ -6,7 +6,7 @@
         <div class="context-pill">
           <span class="ctx-root">ONDA INFRA</span>
           <span class="ctx-sep">/</span>
-          <span class="ctx-active">PARTNER CONSOLE</span>
+          <span class="ctx-active">{{ activeViewLabel }}</span>
         </div>
       </div>
 
@@ -24,7 +24,7 @@
           </div>
         </div>
 
-        <button class="btn-logout-elite" @click="$emit('logout')">
+        <button class="btn-logout-elite" @click="logout">
           <span class="logout-lb">Déconnexion</span>
           <span class="logout-ic"><i class="fas fa-sign-out-alt"></i></span>
         </button>
@@ -34,9 +34,34 @@
 </template>
 
 <script>
+import { computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+
 export default {
   name: 'Header',
-  emits: ['logout']
+  setup() {
+    const route = useRoute();
+    const router = useRouter();
+
+    const activeViewLabel = computed(() => {
+      const labels = {
+        Dashboard: 'CONSOLE MONITOR',
+        Organizations: 'GESTION CLIENTS',
+        AIConnectors: 'IA CONNECTEURS',
+        ApiDocs: 'DOCUMENTATION API',
+        Billing: 'FACTURATION & QUOTAS'
+      };
+      return labels[route.name] || 'PARTNER CONSOLE';
+    });
+
+    const logout = () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('apiKey');
+      router.push({ name: 'Landing' });
+    };
+
+    return { activeViewLabel, logout };
+  }
 }
 </script>
 
@@ -70,7 +95,7 @@ export default {
   background: white; border: 1px solid #FECDD3; color: #E11D48;
   padding: 0.6rem 1.25rem; border-radius: 10px; cursor: pointer;
   font-family: var(--font-heading); font-weight: 800; font-size: 0.85rem;
-  display: flex; align-items: center; gap: 0.75rem; transition: all 0.3s var(--bounce);
+  display: flex; align-items: center; gap: 0.75rem; transition: all 0.3s;
 }
 
 .btn-logout-elite:hover { background: #BE123C; color: white; border-color: #BE123C; transform: scale(1.05); }

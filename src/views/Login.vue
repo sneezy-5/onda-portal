@@ -241,11 +241,11 @@
 
 <script>
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 import apiService from '../services/api.js';
 
 export default {
   name: 'Login',
-  emits: ['login'],
   directives: {
     'click-outside': {
       mounted(el, binding) {
@@ -261,7 +261,8 @@ export default {
       }
     }
   },
-  setup(props, { emit }) {
+  setup() {
+    const router = useRouter();
     const isLogin = ref(true);
     const isOtpMode = ref(false);
     const loading = ref(false);
@@ -326,7 +327,7 @@ export default {
       try {
         const res = await apiService.login(loginData.value.email, loginData.value.password);
         if (res.success) {
-          emit('login');
+          router.push({ name: 'Dashboard' });
         } else {
           error.value = res.message || 'Identifiants incorrects';
         }
@@ -373,7 +374,7 @@ export default {
       try {
         const res = await apiService.verifyOtp(otpEmail.value, otpValue.value);
         if (res.success) {
-          emit('login');
+          router.push({ name: 'Dashboard' });
         } else {
           error.value = res.message || 'Code invalide ou expiré';
         }

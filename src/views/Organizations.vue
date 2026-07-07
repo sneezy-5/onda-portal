@@ -30,57 +30,94 @@
       </div>
 
       <!-- Active Nodes -->
-      <div 
-        v-for="org in organizations" 
-        :key="org.id"
-        class="card-premium node-card p-8"
-      >
-        <div class="node-header">
-          <div class="node-icon-box">
-            <i :class="getOrgIcon(org.type)"></i>
-          </div>
-          <div class="node-identity">
-            <h4>{{ org.name }}</h4>
-            <div class="node-id-tag">
-              <code>ID: {{ org.id }}</code>
-              <button class="btn-copy-mini" @click="copyId(org.id)">
-                <i class="fas fa-copy"></i>
-              </button>
+      <template v-else>
+        <div 
+          v-for="org in paginatedOrganizations" 
+          :key="org.id"
+          class="card-premium node-card p-8"
+        >
+          <div class="node-header">
+            <div class="node-icon-box">
+              <i :class="getOrgIcon(org.type)"></i>
+            </div>
+            <div class="node-identity">
+              <h4>{{ org.name }}</h4>
+              <div class="node-id-tag">
+                <code>ID: {{ org.id }}</code>
+                <button class="btn-copy-mini" @click="copyId(org.id)">
+                  <i class="fas fa-copy"></i>
+                </button>
+              </div>
+            </div>
+            <div class="node-status">
+              <span class="status-indicator live"></span>
+              LIVE
             </div>
           </div>
-          <div class="node-status">
-            <span class="status-indicator live"></span>
-            LIVE
+
+          <div class="node-stats mt-8">
+            <div class="node-stat-item">
+              <span class="l">Type</span>
+              <span class="v">{{ org.type || 'Non spécifié' }}</span>
+            </div>
+            <div class="node-stat-item">
+              <span class="l">Statut Juridique</span>
+              <span class="v">{{ org.legalForm || 'N/A' }}</span>
+            </div>
+            <div v-if="org.parentId || (org.parent && org.parent.id)" class="node-stat-item">
+              <span class="l">Siège</span>
+              <span class="v">Lié</span>
+            </div>
+            <div v-else class="node-stat-item">
+              <span class="l">Uptime 24h</span>
+              <span class="v text-success">100.0%</span>
+            </div>
           </div>
+
+          <div class="node-footer mt-8">
+            <button class="btn btn-pill-outline w-full" @click="regenerateClientKey(org)">
+              <i class="fas fa-key mr-2"></i> Régénérer Clé API
+            </button>
+            <button class="btn-action-premium btn-action-delete" @click="deleteOrg(org.id)" title="Supprimer">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Pagination Premium -->
+    <div v-if="organizations.length > pageSize" class="pagination-premium-container mt-12">
+      <div class="pagination-info">
+        Affichage de <strong>{{ pagedFrom }} - {{ pagedTo }}</strong> sur <strong>{{ organizations.length }}</strong> environnements
+      </div>
+      <div class="pagination-controls">
+        <button 
+          class="btn-page-step" 
+          :disabled="currentPage === 1"
+          @click="currentPage--"
+        >
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <div class="page-numbers">
+          <button 
+            v-for="p in totalPages" 
+            :key="p"
+            :class="['btn-page-num', { active: currentPage === p }]"
+            @click="currentPage = p"
+          >
+            {{ p }}
+          </button>
         </div>
 
-        <div class="node-stats mt-8">
-          <div class="node-stat-item">
-            <span class="l">Type</span>
-            <span class="v">{{ org.type || 'Non spécifié' }}</span>
-          </div>
-          <div class="node-stat-item">
-            <span class="l">Statut Juridique</span>
-            <span class="v">{{ org.legalForm || 'N/A' }}</span>
-          </div>
-          <div v-if="org.parentId" class="node-stat-item">
-            <span class="l">Siège</span>
-            <span class="v">Lié</span>
-          </div>
-          <div v-else class="node-stat-item">
-            <span class="l">Uptime 24h</span>
-            <span class="v text-success">100.0%</span>
-          </div>
-        </div>
-
-        <div class="node-footer mt-8">
-          <button class="btn btn-pill-outline w-full" @click="regenerateClientKey(org)">
-            <i class="fas fa-key mr-2"></i> Régénérer Clé API
-          </button>
-          <button class="btn-icon-danger" @click="deleteOrg(org.id)">
-            <i class="fas fa-trash-alt"></i>
-          </button>
-        </div>
+        <button 
+          class="btn-page-step" 
+          :disabled="currentPage === totalPages"
+          @click="currentPage++"
+        >
+          <i class="fas fa-chevron-right"></i>
+        </button>
       </div>
     </div>
 
@@ -220,7 +257,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import apiService from '../services/api.js';
 import ActionDialog from '../components/ActionDialog.vue';
 
@@ -233,6 +270,29 @@ export default {
     const showModal = ref(false);
     const creating = ref(false);
     const error = ref('');
+    
+    // Pagination State
+    const currentPage = ref(1);
+    const pageSize = ref(6);
+    const totalPages = ref(1);
+    const totalElements = ref(0);
+
+    const pagedFrom = computed(() => (currentPage.value - 1) * pageSize.value + 1);
+    const pagedTo = computed(() => Math.min(currentPage.value * pageSize.value, totalElements.value));
+    
+    // In Array mode, we need to slice on frontend. 
+    // In Page mode, the backend already sliced it.
+    const isArrayMode = ref(false);
+
+    const paginatedOrganizations = computed(() => {
+      if (isArrayMode.value) {
+        const start = (currentPage.value - 1) * pageSize.value;
+        const end = start + pageSize.value;
+        return organizations.value.slice(start, end);
+      }
+      return organizations.value; // Server-side already paginated
+    });
+
     const newOrg = ref({ 
       name: '', 
       contactEmail: '', 
@@ -294,12 +354,41 @@ export default {
     const load = async () => {
       loading.value = true;
       try {
-        const res = await apiService.getOrganizations();
-        organizations.value = res.success ? res.data : [];
+        console.log('Fetching organizations...', { page: currentPage.value - 1, size: pageSize.value });
+        const res = await apiService.getOrganizations(currentPage.value - 1, pageSize.value);
+        console.log('API Response:', res);
+        
+        if (res.success && res.data) {
+          if (Array.isArray(res.data)) {
+            isArrayMode.value = true;
+            organizations.value = res.data;
+            totalElements.value = res.data.length;
+            totalPages.value = Math.ceil(res.data.length / pageSize.value) || 1;
+          } else {
+            isArrayMode.value = false;
+            organizations.value = res.data.content || [];
+            totalPages.value = res.data.totalPages || 1;
+            totalElements.value = res.data.totalElements || 0;
+          }
+        } else {
+            organizations.value = [];
+        }
       } catch (e) {
         organizations.value = [];
-      } finally { loading.value = false; }
+        console.error('Erreur lors du chargement des organisations:', e);
+      } finally { 
+        loading.value = false; 
+        console.log('Load finished. Organizations count:', organizations.value.length);
+      }
     };
+
+    // Reload on page change
+    watch(currentPage, load);
+    // Reload on page size change
+    watch(pageSize, () => {
+      currentPage.value = 1;
+      load();
+    });
 
     const createOrganization = async () => {
       creating.value = true;
@@ -332,13 +421,17 @@ export default {
     const deleteOrg = async (id) => {
       const confirmed = await openDialog('DANGER', {
         title: 'Confirmer la suppression',
-        message: 'Voulez-vous vraiment terminer cette instance ? Les données liées seront gelées.',
+        message: 'Voulez-vous vraiment supprimer cette organisation ? Cette action est irréversible et supprimera toutes les données liées.',
         confirmText: 'Supprimer'
       });
       
       if(confirmed) {
-        // Flux simulé
-        organizations.value = organizations.value.filter(o => o.id !== id);
+        try {
+          await apiService.deleteOrganization(id);
+          await load();
+        } catch (e) {
+          await openDialog('INFO', { title: 'Erreur', message: e.message });
+        }
       }
     };
 
@@ -371,7 +464,8 @@ export default {
 
     return { 
       organizations, loading, showModal, creating, error, newOrg, 
-      dialog, getOrgIcon, createOrganization, copyId, deleteOrg, regenerateClientKey,
+      currentPage, pageSize, totalPages, paginatedOrganizations, pagedFrom, pagedTo,
+      dialog, getOrgIcon, load, createOrganization, copyId, deleteOrg, regenerateClientKey,
       handleDialogConfirm, handleDialogCancel
     };
   }
@@ -531,5 +625,58 @@ export default {
   .form-row-deployment { grid-template-columns: 1fr; }
   .node-header { flex-direction: column; align-items: flex-start; }
   .node-status { align-self: flex-start; }
+}
+
+/* Pagination Styling */
+.pagination-premium-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2.5rem;
+  background: white;
+  border-radius: 1.5rem;
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.pagination-info { font-size: 0.9rem; color: var(--text-dim); }
+.pagination-info strong { color: var(--text-main); }
+
+.pagination-controls { display: flex; align-items: center; gap: 1rem; }
+.page-numbers { display: flex; gap: 0.5rem; }
+
+.btn-page-step, .btn-page-num {
+  width: 42px; height: 42px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-surface-dim);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.3s;
+  color: var(--text-dim);
+}
+
+.btn-page-step:hover:not(:disabled), .btn-page-num:hover {
+  background: white;
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.btn-page-num.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+
+.btn-page-step:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1024px) {
+  .pagination-premium-container { flex-direction: column; gap: 1.5rem; text-align: center; }
 }
 </style>

@@ -3,96 +3,90 @@
     <!-- Clean background -->
     <div class="bg-mesh"></div>
     
-    <Sidebar v-if="isAuthenticated" :currentView="currentView" @navigate="handleNavigate($event)" />
+    <Sidebar v-if="showNavigation" />
     
-    <main :class="['main-content', { 'with-sidebar': isAuthenticated }]">
-      <Header v-if="isAuthenticated" @logout="handleLogout" />
+    <main :class="['main-content', { 'with-sidebar': showNavigation, 'admin-mode': !showNavigation && isAuthOrAdmin }]">
+      <Header v-if="showNavigation" />
       
-      <div class="content-viewport">
-        <transition name="fade-slide" mode="out-in">
-          <component 
-            :is="currentComponent" 
-            :key="currentComponent"
-            @login="handleLogin" 
-            @navigate="handleNavigate" 
-          />
-        </transition>
+      <div :class="['content-viewport', { 'full-screen': !showNavigation }]">
+        <router-view v-slot="{ Component }">
+          <transition name="fade-slide" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </div>
     </main>
   </div>
 </template>
 
 <script>
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import Sidebar from './components/Sidebar.vue';
 import Header from './components/Header.vue';
-import LandingPage from './views/LandingPage.vue';
-import Login from './views/Login.vue';
-import Dashboard from './views/Dashboard.vue';
-import Organizations from './views/Organizations.vue';
-import Billing from './views/Billing.vue';
-import ApiDocs from './views/ApiDocs.vue';
 
 export default {
   name: 'App',
   components: {
     Sidebar,
-    Header,
-    LandingPage,
-    Login,
-    Dashboard,
-    Organizations,
-    Billing,
-    ApiDocs
+    Header
   },
   setup() {
-    const currentView = ref(sessionStorage.getItem('currentView') || 'landing');
-    const isAuthenticated = ref(!!localStorage.getItem('apiKey') || !!localStorage.getItem('token'));
+    const route = useRoute();
+    const router = useRouter();
+    const tokenPresent = ref(!!localStorage.getItem('token'));
 
-    const currentComponent = computed(() => {
-      if (!isAuthenticated.value) {
-        return currentView.value === 'login' ? 'Login' : 'LandingPage';
-      }
-      return {
-        dashboard: 'Dashboard',
-        organizations: 'Organizations',
-        billing: 'Billing',
-        docs: 'ApiDocs'
-      }[currentView.value] || 'Dashboard';
+    const showNavigation = computed(() => {
+      const isLandingOrLogin = route.name === 'Landing' || route.name === 'Login';
+      const isAdminRoute = route.name?.toString().startsWith('Admin') || route.name === 'BackOffice';
+      return tokenPresent.value && !isLandingOrLogin && !isAdminRoute;
     });
 
-    watch(currentView, (newView) => {
+    const isAuthOrAdmin = computed(() => {
+      const isLandingOrLogin = route.name === 'Landing' || route.name === 'Login';
+      const isAdminRoute = route.name?.toString().startsWith('Admin') || route.name === 'BackOffice';
+      return tokenPresent.value || isAdminRoute || isLandingOrLogin;
+    });
+
+    const handleUnauthorized = () => {
+      console.warn('Unauthorized access detected. Logging out...');
+      localStorage.removeItem('token');
+      localStorage.removeItem('apiKey');
+      tokenPresent.value = false;
+      router.push({ name: 'Landing' });
+    };
+
+    onMounted(() => {
+      window.addEventListener('unauthorized', handleUnauthorized);
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener('unauthorized', handleUnauthorized);
+    });
+
+    watch(() => route.path, () => {
+      tokenPresent.value = !!localStorage.getItem('token');
+    });
+
+    // Dynamic Title based on Route
+    watch(() => route.name, (routeName) => {
       const titles = {
-        landing: 'Bienvenue | ONDA Infrastructure',
-        login: 'Connexion | Console Partenaire ONDA',
-        dashboard: 'Tableau de Bord | ONDA Partner',
-        organizations: 'Gestion des Clients | ONDA',
-        billing: 'Capacité & Facturation | ONDA',
-        docs: 'Documentation API | ONDA Developer'
+        Landing: 'Bienvenue | ONDA Infrastructure',
+        Dashboard: 'Tableau de Bord | ONDA Partner',
+        Organizations: 'Gestion des Clients | ONDA',
+        Billing: 'Capacité & Facturation | ONDA',
+        ApiDocs: 'Documentation API | ONDA Developer',
+        AIConnectors: 'IA Connecteurs | ONDA Brain',
+        BackOffice: 'Administration Système | ONDA',
+        AdminDashboard: 'Dashboard Admin | ONDA',
+        AdminKyc: 'Validation KYC | ONDA',
+        AdminAudit: 'Audit Fiscal | ONDA',
+        AdminMaintenance: 'Maintenance Système | ONDA'
       };
-      document.title = titles[newView] || 'ONDA Partner Portal';
+      document.title = titles[routeName] || 'ONDA Partner Portal';
     }, { immediate: true });
 
-    const handleNavigate = (view) => {
-      currentView.value = view;
-      sessionStorage.setItem('currentView', view);
-    };
-
-    const handleLogin = () => {
-      isAuthenticated.value = true;
-      currentView.value = 'dashboard';
-      sessionStorage.setItem('currentView', 'dashboard');
-    };
-
-    const handleLogout = () => {
-      localStorage.removeItem('apiKey');
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('currentView');
-      isAuthenticated.value = false;
-      currentView.value = 'landing';
-    };
-
-    return { currentView, isAuthenticated, currentComponent, handleNavigate, handleLogin, handleLogout };
+    return { showNavigation };
   }
 };
 </script>
@@ -117,12 +111,23 @@ export default {
   margin-left: 280px;
 }
 
+.main-content.admin-mode {
+  margin-left: 0;
+}
+
 .content-viewport {
   flex: 1;
-  padding: 5rem 4rem; /* Increased significantly */
-  max-width: 1600px; /* Wider for more air */
+  padding: 5rem 4rem;
+  max-width: 1600px;
   width: 100%;
   margin: 0 auto;
+}
+
+.content-viewport.full-screen {
+  padding: 0;
+  max-width: none;
+  margin: 0;
+  height: 100vh;
 }
 
 /* Page Transitions */

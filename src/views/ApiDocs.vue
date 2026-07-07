@@ -173,12 +173,12 @@
 
             <!-- Partner API Items -->
             <div v-if="activeSection === 'partner-provisioning'">
-              <h2 class="section-title mb-8">2. GESTION PARTENAIRE (Master API)</h2>
-              <p class="doc-paragraph mb-8">Utilisez votre Clé Maître pour ces appels.</p>
+              <h2 class="section-title mb-8">2. GESTION DES ORGANISATIONS (Sous-Clients)</h2>
+              <p class="doc-paragraph mb-8">Cette API permet au partenaire de gérer ses clients directement depuis son infrastructure. Header requis : <code>X-API-KEY: {Master_Key}</code>.</p>
               
-              <h3 class="text-xl font-bold mb-4">2.1 Enrôler un nouveau Client (Boutique)</h3>
-              <p class="doc-paragraph mb-4">Créez un compte ONDA automatique pour votre client sans interaction utilisateur.</p>
-              <div class="endpoint-block mb-8">
+              <h3 class="text-xl font-bold mb-4">2.1 Enrôler un nouveau Client</h3>
+              <p class="doc-paragraph mb-4">Créez un environnement ONDA isolé pour votre client.</p>
+              <div class="endpoint-block mb-12">
                 <div class="endpoint-meta">
                   <span class="method post">POST</span>
                   <span class="path">/api/partners/organizations</span>
@@ -186,70 +186,82 @@
                 <div class="code-terminal-premium mt-6">
                   <div class="term-head">Body JSON</div>
                   <pre><code>{
-  <span class="k">"name"</span>: <span class="s">"Supermarché Le Plateau"</span>,
-  <span class="k">"activitySector"</span>: <span class="s">"GENERAL_TRADE"</span>, <span class="n">// GENERAL_TRADE, RESTAURANT, PHARMACY, SERVICE...</span>
+  <span class="k">"name"</span>: <span class="s">"Boulangerie du Centre"</span>,
+  <span class="k">"type"</span>: <span class="s">"RETAIL"</span>,
+  <span class="k">"activitySector"</span>: <span class="s">"FOOD_BEVERAGE"</span>,
   <span class="k">"country"</span>: <span class="s">"CI"</span>,
-  <span class="k">"currency"</span>: <span class="s">"XOF"</span>,
-  <span class="k">"phone"</span>: <span class="s">"+2250700000000"</span>,
-  <span class="k">"email"</span>: <span class="s">"contact@supermarcheplateau.ci"</span>,
-  <span class="k">"legalForm"</span>: <span class="s">"SARL"</span>
-}</code></pre>
-                </div>
-                <div class="code-terminal-premium mt-4">
-                  <div class="term-head">Réponse (201 Created)</div>
-                  <pre><code>{
-  <span class="k">"success"</span>: <span class="n">true</span>,
-  <span class="k">"data"</span>: <span class="s">"a1b2c3d4-e5f6-7890-uuid-organization"</span>, <span class="n">// <--- Gardez cet ID précieusement !</span>
-  <span class="k">"message"</span>: <span class="s">"Organisation créée avec succès."</span>
+  <span class="k">"phone"</span>: <span class="s">"+225..."</span>,
+  <span class="k">"email"</span>: <span class="s">"contact@boulangerie.ci"</span>
 }</code></pre>
                 </div>
               </div>
 
-              <h3 class="text-xl font-bold mb-4 mt-12">2.2 Cas Multi-Sites : Ajouter une Boutique (Sous-Organisation)</h3>
-              <p class="doc-paragraph mb-4">Si votre client possède plusieurs points de vente (ex: Siège et 3 Boutiques), vous pouvez les lier dans une structure hiérarchique.</p>
-              <div class="endpoint-block mb-8">
+              <h3 class="text-xl font-bold mb-4">2.2 Lister les Organisations (Pagination)</h3>
+              <p class="doc-paragraph mb-4">Récupérez la liste paginée de vos clients. Utile pour les portails à haut volume.</p>
+              <div class="endpoint-block mb-12">
                 <div class="endpoint-meta">
-                   <span class="method post">POST</span>
-                   <span class="path">/api/partners/organizations</span>
+                  <span class="method get">GET</span>
+                  <span class="path">/api/partners/organizations?page=0&size=20</span>
+                </div>
+                <div class="code-terminal-premium mt-6">
+                  <div class="term-head">Réponse JSON (Page Spring)</div>
+                  <pre><code>{
+  <span class="k">"success"</span>: <span class="n">true</span>,
+  <span class="k">"data"</span>: {
+    <span class="k">"content"</span>: [
+      {
+        <span class="k">"id"</span>: <span class="s">"uuid-boutique-1"</span>,
+        <span class="k">"name"</span>: <span class="s">"Boulangerie du Centre"</span>,
+        <span class="k">"type"</span>: <span class="s">"RETAIL"</span>,
+        <span class="k">"createdAt"</span>: <span class="s">"2026-01-01T10:00:00"</span>
+      }
+    ],
+    <span class="k">"totalPages"</span>: 5,
+    <span class="k">"totalElements"</span>: 98,
+    <span class="k">"size"</span>: 20,
+    <span class="k">"number"</span>: 0
+  }
+}</code></pre>
+                </div>
+              </div>
+
+              <h3 class="text-xl font-bold mb-4">2.3 Modifier une Organisation</h3>
+              <p class="doc-paragraph mb-4">Mettez à jour les métadonnées d'un environnement client.</p>
+              <div class="endpoint-block mb-12">
+                <div class="endpoint-meta">
+                  <span class="method put">PUT</span>
+                  <span class="path">/api/partners/organizations/{id}</span>
                 </div>
                 <div class="code-terminal-premium mt-6">
                   <div class="term-head">Body JSON</div>
                   <pre><code>{
-  <span class="k">"name"</span>: <span class="s">"Supermarché Le Plateau - Boutique 2"</span>,
-  <span class="k">"parentId"</span>: <span class="s">"a1b2c3d4-e5f6-7890-uuid-siege"</span>, <span class="n">// <--- ID du Siège (Organisation Parente)</span>
-  <span class="k">"activitySector"</span>: <span class="s">"GENERAL_TRADE"</span>,
-  <span class="k">"country"</span>: <span class="s">"CI"</span>
+  <span class="k">"name"</span>: <span class="s">"Nouveau Nom de la Boutique"</span>,
+  <span class="k">"type"</span>: <span class="s">"SERVICES"</span>,
+  <span class="k">"activitySector"</span>: <span class="s">"CONSULTING"</span>,
+  <span class="k">"vatRate"</span>: <span class="n">18.0</span>
 }</code></pre>
                 </div>
               </div>
-              <div class="doc-callout warning p-6 mb-12">
-                <strong>⚠️ Isolation Comptable</strong>
-                <p>Chaque sous-organisation créée dispose de sa propre comptabilité totalement isolée (comptes, grand livre, budgets).</p>
+
+              <h3 class="text-xl font-bold mb-4">2.4 Supprimer une Organisation</h3>
+              <div class="doc-callout danger p-6 mb-6">
+                <strong>⚠️ Suppression Irréversible</strong>
+                <p>La suppression supprime également toutes les données liées (transactions, comptes, utilisateurs). Cette opération ne peut pas être annulée.</p>
               </div>
-
-              <h3 class="text-xl font-bold mb-4 mt-12">2.3 Schéma de la Hiérarchie</h3>
-              <div class="hierarchy-diagram card-premium p-8 mb-10 bg-white">
-                <div class="mermaid-box flex justify-center">
-                  <pre class="mermaid">
-graph TD
-    P[PARTENAIRE INTEGRATEUR<br/>(Ex: WareTrack ERP)] -->|Gère via Clé Maître| C1[CLIENT : Siège Social<br/>(Ex: Supermarché Le Plateau)]
-    P -->|Gère via Clé Maître| C2[CLIENT : Autre Société]
-    
-    C1 -->|Possède| S1[Sous-Org : Boutique 1<br/>(Caisse & Stock Isolé)]
-    C1 -->|Possède| S2[Sous-Org : Boutique 2<br/>(Caisse & Stock Isolé)]
-
-    style P fill:#2d3748,stroke:#cbd5e0,stroke-width:2px,color:#fff
-    style C1 fill:#3182ce,stroke:#2b6cb0,stroke-width:2px,color:#fff
-    style C2 fill:#3182ce,stroke:#2b6cb0,stroke-width:2px,color:#fff
-    style S1 fill:#48bb78,stroke:#2f855a,stroke-width:1px,color:#fff
-    style S2 fill:#48bb78,stroke:#2f855a,stroke-width:1px,color:#fff
-                  </pre>
+              <div class="endpoint-block mb-12">
+                <div class="endpoint-meta">
+                  <span class="method delete">DELETE</span>
+                  <span class="path">/api/partners/organizations/{id}</span>
+                </div>
+                <div class="code-terminal-premium mt-6">
+                  <div class="term-head">Réponse</div>
+                  <pre><code>{ <span class="k">"success"</span>: <span class="n">true</span>, <span class="k">"message"</span>: <span class="s">"Organisation supprimée"</span> }</code></pre>
                 </div>
               </div>
 
-              <h3 class="text-xl font-bold mb-4">2.4 Récupérer / Régénérer la Clé API du Client</h3>
-              <p class="doc-paragraph mb-4">Générez une nouvelle clé pour un client ou pour vous-même (Master Key).</p>
-              <div class="endpoint-block">
+              <h3 class="text-xl font-bold mb-4">2.5 Régénérer la Clé API d'un Client</h3>
+              <p class="doc-paragraph mb-4">Générez une nouvelle clé <code>sk_live_...</code> ou <code>sk_test_...</code> pour un client.</p>
+              <div class="endpoint-block mb-12">
                 <div class="endpoint-meta">
                   <span class="method post">POST</span>
                   <span class="path">/api/partners/api-keys/regenerate</span>
@@ -257,27 +269,24 @@ graph TD
                 <div class="code-terminal-premium mt-6">
                   <div class="term-head">Body JSON</div>
                   <pre><code>{
-  <span class="k" title="ID de l'organisation. Laissez vide ou null pour régénérer votre Clé Maître.">"organizationId"</span>: <span class="s">"a1b2c3d4-e5f6...-uuid"</span>,
-  <span class="k" title="'sandbox' ou 'production'. Si vide, le système utilise l'environnement de la clé qui appelle.">"environment"</span>: <span class="s">"sandbox"</span> <span class="n">// OBLIGATOIRE pour forcer TEST (sandbox)</span>
+  <span class="k">"organizationId"</span>: <span class="s">"uuid-du-client"</span>,
+  <span class="k">"environment"</span>: <span class="s">"production"</span> <span class="n">// sandbox ou production</span>
 }</code></pre>
                 </div>
-                
-                <div class="doc-callout warning mt-6 p-4 text-sm">
-                  <strong>ℹ️ Comportement de l'Environnement</strong>
-                  <ul class="list-disc pl-5 mt-2">
-                    <li>Si <code>environment</code> est <strong>sandbox</strong>, vous recevez une clé <code>sk_test_...</code></li>
-                    <li>Si <code>environment</code> est <strong>production</strong>, vous recevez une clé <code>sk_live_...</code></li>
-                    <li>Si omis, le système utilise l'environnement actuel de votre session.</li>
-                  </ul>
-                </div>
+              </div>
 
-                <div class="code-terminal-premium mt-6">
-                  <div class="term-head">Réponse</div>
-                  <pre><code>{
-  <span class="k">"success"</span>: <span class="n">true</span>,
-  <span class="k">"data"</span>: <span class="s">"sk_test_..."</span>,
-  <span class="k">"message"</span>: <span class="s">"Clé générée avec succès"</span>
-}</code></pre>
+              <h3 class="text-xl font-bold mb-4 mt-12">Graphique de Structure (Multi-Site)</h3>
+              <div class="hierarchy-diagram card-premium p-8 bg-white">
+                <div class="mermaid-box flex justify-center">
+                  <pre class="mermaid">
+graph TD
+    P[PARTENAIRE INTEGRATEUR] -->|Clé Maître| C1[CLIENT : Siège Social]
+    C1 -->|Lien parentId| S1[Sous-Org : Boutique 1]
+    C1 -->|Lien parentId| S2[Sous-Org : Boutique 2]
+    style P fill:#2d3748,color:#fff
+    style C1 fill:#3182ce,color:#fff
+    style S1 fill:#48bb78,color:#fff
+                  </pre>
                 </div>
               </div>
             </div>

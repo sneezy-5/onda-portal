@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8082';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.10:8080';
 
 class ApiService {
     constructor() {
@@ -86,6 +86,8 @@ class ApiService {
 
     async request(endpoint, options = {}) {
         const url = `${API_BASE_URL}${endpoint}`;
+        console.log(`[API Request] ${options.method || 'GET'} ${url}`);
+        
         const config = {
             ...options,
             headers: {
@@ -96,15 +98,28 @@ class ApiService {
 
         try {
             const response = await fetch(url, config);
-            const data = await response.json();
+            console.log(`[API Response] ${response.status} ${url}`);
+            
+            // Check if response is JSON
+            const contentType = response.headers.get("content-type");
+            let data;
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                data = await response.json();
+            } else {
+                data = { message: await response.text() };
+            }
 
             if (!response.ok) {
-                throw new Error(data.message || 'Une erreur est survenue');
+                console.error(`[API Error] ${response.status} ${url}`, data);
+                if (response.status === 401 || response.status === 403) {
+                    window.dispatchEvent(new CustomEvent('unauthorized'));
+                }
+                throw new Error(data.message || data || 'Une erreur est survenue');
             }
 
             return data;
         } catch (error) {
-            console.error('API Error:', error);
+            console.error(`[API Network Error] ${url}`, error);
             throw error;
         }
     }
@@ -138,10 +153,33 @@ class ApiService {
 
     /**
      * GET /api/partners/organizations
-     * Lister les organisations clientes
+     * Lister les organisations clientes (avec pagination Spring Data)
+     * @param {number} page - Page (0-indexed)
+     * @param {number} size - Taille de page
      */
-    async getOrganizations() {
-        return this.request('/api/partners/organizations'); // Returns object with 'data' array
+    async getOrganizations(page = 0, size = 10, sort = 'createdAt,desc') {
+        return this.request(`/api/partners/organizations?page=${page}&size=${size}&sort=${sort}`);
+    }
+
+    /**
+     * PUT /api/partners/organizations/{id}
+     * Modifier une organisation
+     */
+    async updateOrganization(id, payload) {
+        return this.request(`/api/partners/organizations/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+        });
+    }
+
+    /**
+     * DELETE /api/partners/organizations/{id}
+     * Supprimer définitivement une organisation
+     */
+    async deleteOrganization(id) {
+        return this.request(`/api/partners/organizations/${id}`, {
+            method: 'DELETE'
+        });
     }
 
     /**
@@ -420,6 +458,76 @@ class ApiService {
      */
     async getAlerts() {
         return this.request('/api/public/alerts');
+    }
+
+    // ========================================
+    // API IA Connecteurs (/api/partner/ai)
+    // ========================================
+
+    /**
+     * GET /api/partner/ai/data-sources
+     * Lister les sources de données IA
+     */
+    async getAIDataSources() {
+        return this.request('/api/partner/ai/data-sources');
+    }
+
+    /**
+     * POST /api/partner/ai/data-sources
+     * Créer une nouvelle source de données IA
+     */
+    async createAIDataSource(payload) {
+        return this.request('/api/partner/ai/data-sources', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+    }
+
+    /**
+     * POST /api/partner/ai/data-sources/{id}/test
+     * Tester une source de données
+     */
+    async testAIDataSource(id) {
+        return this.request(`/api/partner/ai/data-sources/${id}/test`, {
+            method: 'POST'
+        });
+    }
+
+    /**
+     * DELETE /api/partner/ai/data-sources/{id}
+     */
+    async deleteAIDataSource(id) {
+        return this.request(`/api/partner/ai/data-sources/${id}`, {
+            method: 'DELETE'
+        });
+    }
+
+    /**
+     * GET /api/partner/ai/actions
+     * Lister les actions IA (Webhooks)
+     */
+    async getAIActions() {
+        return this.request('/api/partner/ai/actions');
+    }
+
+    /**
+     * POST /api/partner/ai/actions
+     * Créer une nouvelle action IA
+     */
+    async createAIAction(payload) {
+        return this.request('/api/partner/ai/actions', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+    }
+
+    /**
+     * DELETE /api/partner/ai/actions/{id}
+     */
+    async deleteAIAction(id) {
+        return this.request(`/api/partner/ai/actions/${id}`, {
+            method: 'DELETE'
+        });
     }
 }
 
