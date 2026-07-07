@@ -110,7 +110,7 @@
               <div class="btn-visual">
                 <i class="btn-icon fas fa-building"></i>
               </div>
-              <span class="btn-label">Clients & Orgs</span>
+              <span class="btn-label">Partenaires & Orgs</span>
             </router-link>
 
             <router-link :to="{ name: 'AdminUsers' }" class="nav-btn-elite" active-class="active">

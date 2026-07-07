@@ -3,32 +3,32 @@
     <!-- Page Header -->
     <div class="bo-page-header mb-10">
       <div class="header-left">
-        <h2 class="text-4xl font-black tracking-tight">Gestion des <span class="text-accent">Clients</span></h2>
-        <p class="text-muted mt-2">Suivi et administration des organisations enregistrées et de leurs profils d'activité.</p>
+        <h2 class="text-4xl font-black tracking-tight">Gestion des <span class="text-accent">Partenaires</span></h2>
+        <p class="text-muted mt-2">Suivi et administration des partenaires intégrateurs B2B et de leurs organisations rattachées.</p>
       </div>
     </div>
 
     <!-- Stats Cards Grid -->
     <div class="stats-grid mb-10">
       <div class="stat-card">
-        <div class="stat-icon"><i class="fas fa-building"></i></div>
+        <div class="stat-icon"><i class="fas fa-handshake"></i></div>
         <div class="stat-info">
-          <span class="stat-label">Total Clients</span>
+          <span class="stat-label">Total Partenaires</span>
           <span class="stat-value">{{ stats.total }}</span>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon formal"><i class="fas fa-file-signature"></i></div>
+        <div class="stat-icon active"><i class="fas fa-check-circle"></i></div>
         <div class="stat-info">
-          <span class="stat-label">Entreprises Formelles</span>
-          <span class="stat-value">{{ stats.formal }}</span>
+          <span class="stat-label">Partenaires Actifs</span>
+          <span class="stat-value text-success">{{ stats.active }}</span>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon track-stock"><i class="fas fa-cubes"></i></div>
+        <div class="stat-icon suspend"><i class="fas fa-ban"></i></div>
         <div class="stat-info">
-          <span class="stat-label">Suivi de Stock</span>
-          <span class="stat-value">{{ stats.trackStock }}</span>
+          <span class="stat-label">Partenaires Suspendus</span>
+          <span class="stat-value text-danger">{{ stats.suspended }}</span>
         </div>
       </div>
     </div>
@@ -37,21 +37,9 @@
     <div class="filter-bar mb-6">
       <div class="search-box">
         <i class="fas fa-search"></i>
-        <input v-model="searchQuery" type="text" placeholder="Rechercher par nom d'entreprise, email, RCCM..." @input="onFilterChange" />
+        <input v-model="searchQuery" type="text" placeholder="Rechercher par nom, email..." @input="onFilterChange" />
       </div>
       <div class="filters-group">
-        <div class="select-wrapper">
-          <i class="fas fa-filter"></i>
-          <select v-model="clientType" @change="onFilterChange">
-            <option value="ALL">Tous les types</option>
-            <option value="MOBILE">Client Mobile</option>
-            <option value="PARTNER">Client Partenaire</option>
-          </select>
-        </div>
-        <div class="select-wrapper">
-          <i class="fas fa-network-wired"></i>
-          <input v-model="parentId" type="text" placeholder="UUID Parent..." class="input-inline" @input="onFilterChange" />
-        </div>
         <div class="select-wrapper">
           <i class="fas fa-toggle-on"></i>
           <select v-model="selectedStatus" @change="onFilterChange">
@@ -60,99 +48,92 @@
             <option value="SUSPENDED">Suspendus</option>
           </select>
         </div>
-        <div class="select-wrapper">
-          <i class="fas fa-globe"></i>
-          <select v-model="selectedCountry" @change="onFilterChange">
-            <option value="ALL">Tous les pays</option>
-            <option value="CI">Côte d'Ivoire (CI)</option>
-            <option value="SN">Sénégal (SN)</option>
-            <option value="BF">Burkina Faso (BF)</option>
-          </select>
-        </div>
       </div>
     </div>
 
     <!-- Loading State -->
     <div v-if="isLoading" class="loading-state">
       <div class="spinner-elite"></div>
-      <p class="text-muted mt-4">Chargement des clients...</p>
+      <p class="text-muted mt-4">Chargement des partenaires...</p>
     </div>
 
-    <!-- Clients Table -->
+    <!-- Partners Table -->
     <div v-else class="table-wrapper-premium">
-      <div v-if="clients.length === 0" class="empty-state-premium">
-        <div class="empty-icon"><i class="fas fa-store-slash"></i></div>
-        <h3>Aucune organisation trouvée</h3>
+      <div v-if="partners.length === 0" class="empty-state-premium">
+        <div class="empty-icon"><i class="fas fa-user-friends"></i></div>
+        <h3>Aucun partenaire trouvé</h3>
         <p>Ajustez vos filtres ou termes de recherche.</p>
       </div>
 
       <table v-else class="table-premium">
         <thead>
           <tr>
-            <th>Organisation</th>
-            <th>Type / Secteur</th>
-            <th>Contact</th>
-            <th>Pays</th>
-            <th>Dernière Activité</th>
-            <th>Compte</th>
+            <th>Partenaire</th>
+            <th>Préfixe API Key</th>
+            <th>Webhook / IPs</th>
+            <th>Organisations Gérées</th>
+            <th>Statut</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="client in clients" :key="client.id" :class="{ 'row-suspended': client.isActive === false }">
+          <tr v-for="partner in partners" :key="partner.id" :class="{ 'row-suspended': partner.isActive === false }">
             <td>
               <div class="client-cell">
-                <div :class="['avatar-square', client.isActive === false && 'avatar-suspended']">
-                  {{ client.name?.[0] || 'C' }}
+                <div :class="['avatar-square', partner.isActive === false && 'avatar-suspended']">
+                  {{ partner.name?.[0]?.toUpperCase() || 'P' }}
                 </div>
                 <div class="client-details">
-                  <span class="client-name">{{ client.name }}</span>
-                  <span class="client-sub">{{ client.legalForm || 'Non Spécifié' }} · RCCM: {{ client.taxId || 'Aucun' }}</span>
+                  <span class="client-name font-bold">{{ partner.name }}</span>
+                  <span class="client-sub">{{ partner.contactEmail || 'Pas d\'email' }}</span>
                 </div>
               </div>
             </td>
             <td>
-              <div class="type-cell">
-                <span class="type-text">{{ client.type || '—' }}</span>
-                <span class="sector-text">Secteur: {{ client.activitySector || 'Général' }}</span>
+              <span class="api-key-badge font-mono">{{ partner.apiKeyPrefix || '—' }}</span>
+            </td>
+            <td>
+              <div class="webhook-cell">
+                <span class="webhook-url text-xs font-mono" :title="partner.webhookUrl">{{ partner.webhookUrl || 'Pas de webhook' }}</span>
+                <span class="allowed-ips text-xs text-muted" :title="partner.allowedIps">IPs: {{ partner.allowedIps || 'Toutes' }}</span>
               </div>
             </td>
             <td>
-              <div class="contact-cell">
-                <span class="contact-phone">{{ client.phone || '—' }}</span>
-                <span class="contact-email">{{ client.email || '—' }}</span>
-              </div>
+              <button class="btn-org-count" @click="openOrganizationsModal(partner)" title="Voir les organisations gérées">
+                <i class="fas fa-building text-sky-500 mr-2"></i>
+                <span class="underline font-bold">{{ partner.organizationCount || 0 }} organisation(s)</span>
+              </button>
             </td>
             <td>
-              <span class="country-badge">
-                {{ client.country || 'CI' }}
+              <span :class="['account-badge', partner.isActive !== false ? 'account-active' : 'account-suspended']">
+                <i :class="partner.isActive !== false ? 'fas fa-check-circle' : 'fas fa-ban'"></i>
+                {{ partner.isActive !== false ? 'Actif' : 'Suspendu' }}
               </span>
-            </td>
-            <td><span class="date-text">{{ formatActivityDate(client.lastActivityAt) }}</span></td>
-            <td>
-              <span :class="['account-badge', client.isActive !== false ? 'account-active' : 'account-suspended']">
-                <i :class="client.isActive !== false ? 'fas fa-check-circle' : 'fas fa-ban'"></i>
-                {{ client.isActive !== false ? 'Actif' : 'Suspendu' }}
-              </span>
-              <div v-if="client.suspendedReason" class="suspend-reason">{{ client.suspendedReason }}</div>
             </td>
             <td>
               <div class="actions-cell">
                 <button
-                  v-if="client.isActive !== false"
+                  class="action-btn btn-view-orgs"
+                  @click="openOrganizationsModal(partner)"
+                  title="Voir les organisations"
+                >
+                  <i class="fas fa-eye"></i>
+                </button>
+                <button
+                  v-if="partner.isActive !== false"
                   class="action-btn btn-suspend"
-                  @click="openSuspendModal(client)"
-                  :disabled="actionLoading === client.id"
-                  title="Suspendre ce compte"
+                  @click="openSuspendModal(partner, 'partner')"
+                  :disabled="actionLoading === partner.id"
+                  title="Suspendre ce partenaire"
                 >
                   <i class="fas fa-ban"></i>
                 </button>
                 <button
                   v-else
                   class="action-btn btn-activate"
-                  @click="handleActivate(client)"
-                  :disabled="actionLoading === client.id"
-                  title="Réactiver ce compte"
+                  @click="handleActivatePartner(partner)"
+                  :disabled="actionLoading === partner.id"
+                  title="Réactiver ce partenaire"
                 >
                   <i class="fas fa-check-circle"></i>
                 </button>
@@ -166,13 +147,13 @@
     <!-- Pagination Premium -->
     <div v-if="totalElements > pageSize" class="pagination-premium-container mt-12">
       <div class="pagination-info">
-        Affichage de <strong>{{ pagedFrom }} - {{ pagedTo }}</strong> sur <strong>{{ totalElements }}</strong> clients
+        Affichage de <strong>{{ pagedFrom }} - {{ pagedTo }}</strong> sur <strong>{{ totalElements }}</strong> partenaires
       </div>
       <div class="pagination-controls">
         <button 
           class="btn-page-step" 
           :disabled="currentPage === 1"
-          @click="currentPage--; fetchClients()"
+          @click="currentPage--; fetchPartners()"
         >
           <i class="fas fa-chevron-left"></i>
         </button>
@@ -182,7 +163,7 @@
             v-for="p in totalPages" 
             :key="p"
             :class="['btn-page-num', { active: currentPage === p }]"
-            @click="currentPage = p; fetchClients()"
+            @click="currentPage = p; fetchPartners()"
           >
             {{ p }}
           </button>
@@ -191,28 +172,154 @@
         <button 
           class="btn-page-step" 
           :disabled="currentPage === totalPages"
-          @click="currentPage++; fetchClients()"
+          @click="currentPage++; fetchPartners()"
         >
           <i class="fas fa-chevron-right"></i>
         </button>
       </div>
     </div>
 
+    <!-- Partner Organizations Modal -->
+    <div v-if="orgsModal.show" class="modal-backdrop" @click.self="orgsModal.show = false">
+      <div class="modal-box premium-modal-large animate-slide-up">
+        <div class="modal-header">
+          <h3>Organisations de {{ orgsModal.partner?.name }}</h3>
+          <button class="btn-close" @click="orgsModal.show = false"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="organizations-filter mb-4 flex justify-between items-center gap-4">
+            <p class="modal-desc mb-0">Ce partenaire gère <strong>{{ orgsModal.organizations.length }}</strong> organisation(s) :</p>
+            <div class="select-wrapper">
+              <i class="fas fa-globe"></i>
+              <select v-model="orgsModal.selectedCountryFilter">
+                <option value="ALL">Tous les pays</option>
+                <option value="CI">Côte d'Ivoire (CI)</option>
+                <option value="SN">Sénégal (SN)</option>
+                <option value="BF">Burkina Faso (BF)</option>
+                <option value="ML">Mali (ML)</option>
+                <option value="BJ">Bénin (BJ)</option>
+                <option value="TG">Togo (TG)</option>
+                <option value="GN">Guinée (GN)</option>
+                <option value="NE">Niger (NE)</option>
+                <option value="GH">Ghana (GH)</option>
+                <option value="NG">Nigéria (NG)</option>
+                <option value="CM">Cameroun (CM)</option>
+                <option value="CG">Congo (CG)</option>
+                <option value="GA">Gabon (GA)</option>
+              </select>
+            </div>
+          </div>
+
+          <div v-if="orgsModal.isLoading" class="modal-loading py-8 flex flex-col items-center">
+            <div class="spinner-elite"></div>
+            <p class="text-muted mt-2">Chargement des organisations...</p>
+          </div>
+
+          <div v-else class="modal-table-container">
+            <div v-if="filteredModalOrganizations.length === 0" class="empty-state-modal text-center py-8">
+              <i class="fas fa-building text-slate-300 text-3xl mb-2"></i>
+              <p class="text-muted">Aucune organisation correspondante</p>
+            </div>
+            
+            <table v-else class="table-premium table-modal">
+              <thead>
+                <tr>
+                  <th>Organisation</th>
+                  <th>Contact</th>
+                  <th>Pays</th>
+                  <th>Plan & Statut</th>
+                  <th>Compte</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="org in filteredModalOrganizations" :key="org.id" :class="{ 'row-suspended': org.isActive === false }">
+                  <td>
+                    <div class="client-cell">
+                      <div class="org-icon-avatar bg-slate-100 text-slate-700">
+                        {{ org.name?.[0]?.toUpperCase() || 'O' }}
+                      </div>
+                      <div class="client-details">
+                        <span class="client-name font-semibold text-sm">{{ org.name }}</span>
+                        <span class="client-sub text-xs">{{ org.legalForm || 'Non Spécifié' }} · RCCM: {{ org.taxId || 'Aucun' }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="contact-cell">
+                      <span class="contact-phone text-xs font-mono">{{ org.phone || '—' }}</span>
+                      <span class="contact-email text-xs text-muted">{{ org.email || '—' }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="country-badge text-xs">
+                      {{ org.country || 'CI' }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="plan-cell flex flex-col">
+                      <span class="plan-name text-xs font-bold text-sky-600">{{ org.activePlanName }}</span>
+                      <span class="plan-status text-[10px] text-muted">{{ org.activeSubscriptionStatus }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span :class="['account-badge text-xs', org.isActive !== false ? 'account-active' : 'account-suspended']">
+                      {{ org.isActive !== false ? 'Actif' : 'Suspendu' }}
+                    </span>
+                    <div v-if="org.suspendedReason" class="suspend-reason text-[10px] text-red-500">{{ org.suspendedReason }}</div>
+                  </td>
+                  <td>
+                    <div class="actions-cell">
+                      <button
+                        v-if="org.isActive !== false"
+                        class="action-btn btn-suspend text-xs"
+                        @click="openSuspendModal(org, 'organization')"
+                        :disabled="actionLoading === org.id"
+                        title="Suspendre cette organisation"
+                      >
+                        <i class="fas fa-ban"></i>
+                      </button>
+                      <button
+                        v-else
+                        class="action-btn btn-activate text-xs"
+                        @click="handleActivateOrganization(org)"
+                        :disabled="actionLoading === org.id"
+                        title="Réactiver cette organisation"
+                      >
+                        <i class="fas fa-check-circle"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-ghost" @click="orgsModal.show = false">Fermer</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Suspend Modal -->
     <div v-if="suspendModal.show" class="modal-backdrop" @click.self="suspendModal.show = false">
-      <div class="modal-box">
+      <div class="modal-box premium-modal animate-slide-up">
         <div class="modal-header">
           <i class="fas fa-ban text-red-500"></i>
           <h3>Suspendre le compte</h3>
         </div>
-        <p class="modal-desc">Vous allez suspendre le compte de <strong>{{ suspendModal.client?.name }}</strong>. Les utilisateurs de cette organisation ne pourront plus se connecter.</p>
+        <p class="modal-desc">
+          Vous allez suspendre le compte de <strong>{{ suspendModal.target?.name }}</strong>. 
+          <span v-if="suspendModal.type === 'partner'">Toutes les organisations rattachées et leurs utilisateurs ne pourront plus accéder aux services.</span>
+          <span v-else>Les utilisateurs de cette organisation ne pourront plus se connecter.</span>
+        </p>
         <div class="modal-field">
           <label>Raison de la suspension (optionnel)</label>
           <textarea v-model="suspendModal.reason" placeholder="Ex: Non-paiement de facture, violation des CGU..." rows="3"></textarea>
         </div>
         <div class="modal-actions">
           <button class="btn-ghost" @click="suspendModal.show = false">Annuler</button>
-          <button class="btn-danger" @click="handleSuspend" :disabled="actionLoading">Confirmer la suspension</button>
+          <button class="btn-danger" @click="handleConfirmSuspend" :disabled="actionLoading">Confirmer la suspension</button>
         </div>
       </div>
     </div>
@@ -223,72 +330,49 @@
 import { ref, computed, onMounted } from 'vue';
 import adminApi from '../../services/adminApi';
 
-const MOCK_CLIENTS = [
+const MOCK_PARTNERS = [
   {
-    id: "org1",
-    name: "Sneezy Shop",
-    type: "FORMAL",
-    legalForm: "SARL",
-    taxId: "CNI00001",
-    email: "contact@sneezyshop.com",
-    phone: "+225 01020304",
-    country: "CI",
-    createdAt: "2026-06-23T10:32:35",
-    lastActivityAt: "2026-06-23T10:33:00",
-    activePlanName: "Onda Premium",
-    activePlanType: "PREMIUM",
-    activeSubscriptionStatus: "ACTIVE",
-    activitySector: "GENERAL_TRADE",
-    trackStock: true
+    id: "p1",
+    name: "Onda Global Partner",
+    contactEmail: "contact@ondaglobal.com",
+    apiKeyPrefix: "api_onda_glob",
+    webhookUrl: "https://api.ondaglobal.com/webhook",
+    allowedIps: "192.168.1.1, 10.0.0.1",
+    isActive: true,
+    organizationCount: 3
   },
   {
-    id: "org2",
-    name: "Koffi & Fils SARL",
-    type: "FORMAL",
-    legalForm: "SARL",
-    taxId: "RCCM-ABJ-12345",
-    email: "contact@koffi.ci",
-    phone: "+225 05050505",
-    country: "CI",
-    createdAt: "2026-06-15T12:00:00",
-    lastActivityAt: "2026-06-20T18:45:00",
-    activePlanName: "Plan Gratuit",
-    activePlanType: "FREE",
-    activeSubscriptionStatus: "ACTIVE",
-    activitySector: "AGRICULTURE",
-    trackStock: false
-  },
-  {
-    id: "org3",
-    name: "Global Trade CI",
-    type: "FORMAL",
-    legalForm: "SA",
-    taxId: "RCCM-ABJ-98765",
-    email: "info@globaltrade.ci",
-    phone: "+225 08080808",
-    country: "CI",
-    createdAt: "2026-06-21T09:30:00",
-    lastActivityAt: "2026-06-23T10:34:00",
-    activePlanName: "Onda Pro",
-    activePlanType: "PROFESSIONAL",
-    activeSubscriptionStatus: "ACTIVE",
-    activitySector: "SERVICES",
-    trackStock: true
+    id: "p2",
+    name: "Sneezy Integrator",
+    contactEmail: "dev@sneezy.ci",
+    apiKeyPrefix: "api_sneezy_int",
+    webhookUrl: "https://webhook.sneezy.ci/onda",
+    allowedIps: "196.200.1.1",
+    isActive: true,
+    organizationCount: 1
   }
 ];
 
 export default {
   name: 'ClientsManager',
   setup() {
-    const clients = ref([]);
+    const partners = ref([]);
     const isLoading = ref(true);
     const searchQuery = ref('');
-    const selectedCountry = ref('ALL');
-    const clientType = ref('ALL');
-    const parentId = ref('');
     const selectedStatus = ref('ALL');
     const actionLoading = ref(null);
-    const suspendModal = ref({ show: false, client: null, reason: '' });
+
+    // Suspend Modal state (can target partner or organization)
+    const suspendModal = ref({ show: false, type: 'partner', target: null, reason: '' });
+
+    // Organizations Modal state
+    const orgsModal = ref({
+      show: false,
+      partner: null,
+      organizations: [],
+      isLoading: false,
+      selectedCountryFilter: 'ALL'
+    });
 
     // Pagination State
     const currentPage = ref(1);
@@ -299,62 +383,57 @@ export default {
     const pagedFrom = computed(() => (currentPage.value - 1) * pageSize.value + 1);
     const pagedTo = computed(() => Math.min(currentPage.value * pageSize.value, totalElements.value));
 
-    const fetchClients = async () => {
+    const fetchPartners = async () => {
       isLoading.value = true;
       try {
         const params = {
           page: currentPage.value - 1,
           size: pageSize.value,
           search: searchQuery.value,
-          isActive: selectedStatus.value === 'ALL' ? '' : (selectedStatus.value === 'ACTIVE' ? 'true' : 'false'),
-          parentId: parentId.value,
-          clientType: clientType.value === 'ALL' ? '' : clientType.value
+          isActive: selectedStatus.value === 'ALL' ? '' : (selectedStatus.value === 'ACTIVE' ? 'true' : 'false')
         };
-        const res = await adminApi.getClients(params);
+        const res = await adminApi.getPartners(params);
         if (res.success && res.data) {
           if (Array.isArray(res.data)) {
-            // Raw array fallback
-            const filtered = res.data.filter(c => {
+            // Raw array
+            const filtered = res.data.filter(p => {
               const nameQuery = searchQuery.value.toLowerCase().trim();
               const matchesSearch = nameQuery === '' ||
-                c.name.toLowerCase().includes(nameQuery) ||
-                (c.email || '').toLowerCase().includes(nameQuery) ||
-                (c.taxId || '').toLowerCase().includes(nameQuery);
+                p.name.toLowerCase().includes(nameQuery) ||
+                (p.contactEmail || '').toLowerCase().includes(nameQuery);
               
-              const matchesCountry = selectedCountry.value === 'ALL' || c.country === selectedCountry.value;
               const matchesStatus = selectedStatus.value === 'ALL' || 
-                (selectedStatus.value === 'ACTIVE' ? c.isActive !== false : c.isActive === false);
+                (selectedStatus.value === 'ACTIVE' ? p.isActive !== false : p.isActive === false);
               
-              return matchesSearch && matchesCountry && matchesStatus;
+              return matchesSearch && matchesStatus;
             });
-            clients.value = filtered.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value);
+            partners.value = filtered.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value);
             totalElements.value = filtered.length;
             totalPages.value = Math.ceil(filtered.length / pageSize.value) || 1;
           } else {
-            // Spring Page object
-            clients.value = res.data.content || [];
+            // Page object
+            partners.value = res.data.content || [];
             totalPages.value = res.data.totalPages || 1;
             totalElements.value = res.data.totalElements || 0;
           }
         } else {
-          // Mock data fallback
-          const filtered = MOCK_CLIENTS.filter(c => {
+          // Fallback to Mock
+          const filtered = MOCK_PARTNERS.filter(p => {
             const nameQuery = searchQuery.value.toLowerCase().trim();
-            const matchesSearch = nameQuery === '' ||
-              c.name.toLowerCase().includes(nameQuery);
+            const matchesSearch = nameQuery === '' || p.name.toLowerCase().includes(nameQuery);
             return matchesSearch;
           });
-          clients.value = filtered.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value);
+          partners.value = filtered.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value);
           totalElements.value = filtered.length;
           totalPages.value = Math.ceil(filtered.length / pageSize.value) || 1;
         }
       } catch (error) {
-        console.error('Error fetching clients, using mock data...', error);
-        const filtered = MOCK_CLIENTS.filter(c => {
+        console.error('Error fetching partners, using mock data...', error);
+        const filtered = MOCK_PARTNERS.filter(p => {
           const nameQuery = searchQuery.value.toLowerCase().trim();
-          return nameQuery === '' || c.name.toLowerCase().includes(nameQuery);
+          return nameQuery === '' || p.name.toLowerCase().includes(nameQuery);
         });
-        clients.value = filtered.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value);
+        partners.value = filtered.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value);
         totalElements.value = filtered.length;
         totalPages.value = Math.ceil(filtered.length / pageSize.value) || 1;
       } finally {
@@ -364,51 +443,111 @@ export default {
 
     const onFilterChange = () => {
       currentPage.value = 1;
-      fetchClients();
+      fetchPartners();
     };
 
-    const openSuspendModal = (client) => {
-      suspendModal.value = { show: true, client, reason: '' };
+    // Open Suspend modal for partner or organization
+    const openSuspendModal = (target, type) => {
+      suspendModal.value = { show: true, type, target, reason: '' };
     };
 
-    const handleSuspend = async () => {
-      const client = suspendModal.value.client;
-      if (!client) return;
-      actionLoading.value = client.id;
+    const handleConfirmSuspend = async () => {
+      const { type, target, reason } = suspendModal.value;
+      if (!target) return;
+      actionLoading.value = target.id;
       try {
-        await adminApi.suspendClient(client.id, suspendModal.value.reason);
-        const idx = clients.value.findIndex(c => c.id === client.id);
-        if (idx !== -1) {
-          clients.value[idx] = { ...clients.value[idx], isActive: false, suspendedReason: suspendModal.value.reason || "Suspendu par l'administrateur" };
+        if (type === 'partner') {
+          // Suspend Partner
+          await adminApi.togglePartnerActive(target.id); // Toggle active/inactive
+          const idx = partners.value.findIndex(p => p.id === target.id);
+          if (idx !== -1) {
+            partners.value[idx] = { ...partners.value[idx], isActive: false };
+          }
+        } else {
+          // Suspend Organization
+          await adminApi.suspendClient(target.id, reason);
+          const idx = orgsModal.value.organizations.findIndex(o => o.id === target.id);
+          if (idx !== -1) {
+            orgsModal.value.organizations[idx] = { 
+              ...orgsModal.value.organizations[idx], 
+              isActive: false, 
+              suspendedReason: reason || "Suspendu par l'administrateur" 
+            };
+          }
         }
         suspendModal.value.show = false;
       } catch (e) {
-        console.error('Erreur suspension:', e);
+        console.error('Erreur de suspension:', e);
       } finally {
         actionLoading.value = null;
       }
     };
 
-    const handleActivate = async (client) => {
-      actionLoading.value = client.id;
+    const handleActivatePartner = async (partner) => {
+      actionLoading.value = partner.id;
       try {
-        await adminApi.activateClient(client.id);
-        const idx = clients.value.findIndex(c => c.id === client.id);
+        await adminApi.togglePartnerActive(partner.id);
+        const idx = partners.value.findIndex(p => p.id === partner.id);
         if (idx !== -1) {
-          clients.value[idx] = { ...clients.value[idx], isActive: true, suspendedReason: null };
+          partners.value[idx] = { ...partners.value[idx], isActive: true };
         }
       } catch (e) {
-        console.error('Erreur réactivation:', e);
+        console.error('Erreur activation partenaire:', e);
       } finally {
         actionLoading.value = null;
       }
     };
+
+    const handleActivateOrganization = async (org) => {
+      actionLoading.value = org.id;
+      try {
+        await adminApi.activateClient(org.id);
+        const idx = orgsModal.value.organizations.findIndex(o => o.id === org.id);
+        if (idx !== -1) {
+          orgsModal.value.organizations[idx] = { 
+            ...orgsModal.value.organizations[idx], 
+            isActive: true, 
+            suspendedReason: null 
+          };
+        }
+      } catch (e) {
+        console.error('Erreur activation organisation:', e);
+      } finally {
+        actionLoading.value = null;
+      }
+    };
+
+    const openOrganizationsModal = async (partner) => {
+      orgsModal.value.show = true;
+      orgsModal.value.partner = partner;
+      orgsModal.value.organizations = [];
+      orgsModal.value.isLoading = true;
+      orgsModal.value.selectedCountryFilter = 'ALL';
+      try {
+        const res = await adminApi.getPartnerOrganizations(partner.id);
+        if (res.success && res.data) {
+          orgsModal.value.organizations = res.data;
+        }
+      } catch (e) {
+        console.error('Erreur chargement organisations partenaire:', e);
+      } finally {
+        orgsModal.value.isLoading = false;
+      }
+    };
+
+    const filteredModalOrganizations = computed(() => {
+      const filter = orgsModal.value.selectedCountryFilter;
+      if (filter === 'ALL') {
+        return orgsModal.value.organizations;
+      }
+      return orgsModal.value.organizations.filter(o => o.country === filter);
+    });
 
     const stats = computed(() => {
       return {
-        total: totalElements.value || clients.value.length,
-        formal: clients.value.filter(c => c.type === 'FORMAL').length,
-        trackStock: clients.value.filter(c => c.trackStock).length
+        total: totalElements.value || partners.value.length,
+        active: partners.value.filter(p => p.isActive !== false).length,
+        suspended: partners.value.filter(p => p.isActive === false).length
       };
     });
 
@@ -426,13 +565,14 @@ export default {
       });
     };
 
-    onMounted(fetchClients);
+    onMounted(fetchPartners);
 
     return {
-      clients, isLoading, searchQuery, selectedCountry, clientType, parentId, selectedStatus,
+      partners, isLoading, searchQuery, selectedStatus,
       stats, formatDate, formatActivityDate, currentPage, pageSize, totalPages, totalElements,
-      pagedFrom, pagedTo, onFilterChange, fetchClients,
-      actionLoading, suspendModal, openSuspendModal, handleSuspend, handleActivate
+      pagedFrom, pagedTo, onFilterChange, fetchPartners,
+      actionLoading, suspendModal, openSuspendModal, handleConfirmSuspend, handleActivatePartner,
+      orgsModal, openOrganizationsModal, filteredModalOrganizations, handleActivateOrganization
     };
   }
 };
@@ -1068,5 +1208,109 @@ export default {
   .filters-group {
     justify-content: space-between;
   }
+}
+.api-key-badge {
+  background: #f1f5f9;
+  border: 1px solid var(--border-subtle);
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  color: #0f172a;
+  font-size: 0.8rem;
+}
+
+.webhook-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-width: 200px;
+}
+
+.webhook-url {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--text-main);
+}
+
+.btn-org-count {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  font-family: inherit;
+  outline: none;
+}
+
+.btn-org-count span {
+  color: var(--accent);
+  transition: opacity 0.2s;
+}
+
+.btn-org-count:hover span {
+  opacity: 0.8;
+}
+
+.btn-view-orgs {
+  background: rgba(14, 165, 233, 0.1);
+  color: #0284c7;
+}
+
+.btn-view-orgs:hover {
+  background: rgba(14, 165, 233, 0.2);
+  transform: scale(1.05);
+}
+
+/* Large Modal */
+.premium-modal-large {
+  background: white;
+  border-radius: 1.5rem;
+  padding: 2rem;
+  width: 95%;
+  max-width: 860px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  animation: modal-in 0.2s ease;
+}
+
+.table-modal {
+  margin-top: 1rem;
+}
+
+.table-modal th {
+  padding: 0.75rem 1rem;
+  font-size: 0.65rem;
+}
+
+.table-modal td {
+  padding: 0.75rem 1rem;
+  font-size: 0.8rem;
+}
+
+.org-icon-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+}
+
+.btn-close {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-close:hover {
+  color: var(--text-main);
 }
 </style>

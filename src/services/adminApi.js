@@ -265,6 +265,38 @@ class AdminApiService {
     }
 
     /**
+     * Liste de tous les partenaires avec filtres et pagination
+     */
+    async getPartners(params = {}) {
+        const queryString = new URLSearchParams();
+        if (params.page !== undefined) queryString.append('page', params.page);
+        if (params.size !== undefined) queryString.append('size', params.size);
+        if (params.sort !== undefined) queryString.append('sort', params.sort);
+        if (params.search) queryString.append('search', params.search);
+        if (params.isActive !== undefined && params.isActive !== null && params.isActive !== '' && params.isActive !== 'ALL') {
+            queryString.append('isActive', params.isActive);
+        }
+        const qs = queryString.toString();
+        return api.request(`/api/admin/partners${qs ? '?' + qs : ''}`);
+    }
+
+    /**
+     * Liste toutes les organisations gérées par un partenaire
+     */
+    async getPartnerOrganizations(id) {
+        return api.request(`/api/admin/partners/${id}/organizations`);
+    }
+
+    /**
+     * Activer / Désactiver un partenaire
+     */
+    async togglePartnerActive(id) {
+        return api.request(`/api/admin/partners/${id}/toggle-active`, {
+            method: 'PATCH'
+        });
+    }
+
+    /**
      * Liste de tous les abonnements
      */
     async getSubscriptions() {

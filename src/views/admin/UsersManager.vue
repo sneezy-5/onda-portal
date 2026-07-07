@@ -13,7 +13,7 @@
       <div class="stat-card">
         <div class="stat-icon"><i class="fas fa-users"></i></div>
         <div class="stat-info">
-          <span class="stat-label">Total Utilisateurs</span>
+          <span class="stat-label">Utilisateurs ONDA Mobile</span>
           <span class="stat-value">{{ stats.total }}</span>
         </div>
       </div>
@@ -118,7 +118,13 @@
               </span>
             </td>
             <td>
-              <div class="org-cell" v-if="user.organizationName">
+              <div class="org-cell" v-if="user.organizations && user.organizations.length > 0">
+                <button class="btn-org-badge" @click="openUserOrgsModal(user)" title="Voir toutes les organisations de cet utilisateur">
+                  <i class="fas fa-building text-sky-500 mr-2"></i>
+                  <span class="underline font-bold">{{ user.organizations.length }} organisation(s)</span>
+                </button>
+              </div>
+              <div class="org-cell" v-else-if="user.organizationName">
                 <i class="fas fa-building text-slate-400 mr-2"></i>
                 <span class="org-name">{{ user.organizationName }}</span>
               </div>
@@ -184,6 +190,41 @@
         </button>
       </div>
     </div>
+
+    <!-- User Organizations Modal -->
+    <div v-if="userOrgsModal.show" class="modal-backdrop" @click.self="userOrgsModal.show = false">
+      <div class="modal-box premium-modal animate-slide-up">
+        <div class="modal-header">
+          <h3>Organisations de {{ userOrgsModal.user?.firstName }} {{ userOrgsModal.user?.lastName }}</h3>
+          <button class="btn-close" @click="userOrgsModal.show = false"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">Cet utilisateur est membre de <strong>{{ userOrgsModal.user?.organizations?.length || 0 }}</strong> organisation(s) :</p>
+          
+          <div class="orgs-list-premium">
+            <div v-for="org in userOrgsModal.user?.organizations" :key="org.id" class="org-item-card">
+              <div class="org-item-left">
+                <div class="org-icon-avatar">
+                  {{ org.name?.[0]?.toUpperCase() || 'O' }}
+                </div>
+                <div class="org-item-info">
+                  <span class="org-item-name font-bold">{{ org.name }}</span>
+                  <span class="org-item-uuid font-mono text-xs">{{ org.id }}</span>
+                </div>
+              </div>
+              <div class="org-item-right">
+                <span :class="['role-badge', 'role-' + (org.role || 'USER').toLowerCase()]">
+                  {{ org.role }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-ghost" @click="userOrgsModal.show = false">Fermer</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -243,6 +284,11 @@ export default {
     const organizationId = ref('');
     const selectedStatus = ref('ALL');
     const toggleLoading = ref(null);
+    const userOrgsModal = ref({ show: false, user: null });
+
+    const openUserOrgsModal = (user) => {
+      userOrgsModal.value = { show: true, user };
+    };
 
     // Pagination State
     const currentPage = ref(1);
@@ -357,7 +403,8 @@ export default {
     return {
       users, isLoading, searchQuery, selectedRole, organizationId, selectedStatus,
       stats, formatDate, toggleLoading, handleToggleUser,
-      currentPage, pageSize, totalPages, totalElements, pagedFrom, pagedTo, onFilterChange, fetchUsers
+      currentPage, pageSize, totalPages, totalElements, pagedFrom, pagedTo, onFilterChange, fetchUsers,
+      userOrgsModal, openUserOrgsModal
     };
   }
 };
@@ -814,5 +861,113 @@ export default {
 
 .btn-reactivate:hover:not(:disabled) {
   background: rgba(16, 185, 129, 0.2);
+}
+
+.btn-org-badge {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  font-family: inherit;
+  outline: none;
+}
+
+.btn-org-badge span {
+  color: var(--accent);
+  transition: opacity 0.2s;
+}
+
+.btn-org-badge:hover span {
+  opacity: 0.8;
+}
+
+/* Modal styles */
+.orgs-list-premium {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-top: 1rem;
+  padding-right: 0.5rem;
+}
+
+.org-item-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  transition: all 0.2s;
+}
+
+.org-item-card:hover {
+  border-color: var(--accent);
+  background: white;
+  box-shadow: var(--shadow-sm);
+  transform: translateX(3px);
+}
+
+.org-item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.org-icon-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%);
+  color: white;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+.org-item-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.org-item-name {
+  color: var(--text-main);
+  font-size: 0.9rem;
+}
+
+.org-item-uuid {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  margin-top: 0.15rem;
+}
+
+.role-tag {
+  display: inline-flex;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.role-tag.role-owner {
+  background: rgba(14, 165, 233, 0.1);
+  color: #0284c7;
+}
+
+.role-tag.role-admin {
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+}
+
+.role-tag.role-user {
+  background: rgba(100, 116, 139, 0.1);
+  color: #475569;
 }
 </style>
