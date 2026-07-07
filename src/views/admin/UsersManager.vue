@@ -44,12 +44,12 @@
     <div class="filter-bar mb-6">
       <div class="search-box">
         <i class="fas fa-search"></i>
-        <input v-model="searchQuery" type="text" placeholder="Rechercher par nom, email, téléphone..." />
+        <input v-model="searchQuery" type="text" placeholder="Rechercher par nom, email, téléphone..." @input="onFilterChange" />
       </div>
       <div class="filters-group">
         <div class="select-wrapper">
           <i class="fas fa-filter"></i>
-          <select v-model="selectedRole">
+          <select v-model="selectedRole" @change="onFilterChange">
             <option value="ALL">Tous les rôles</option>
             <option value="SUPER_ADMIN">Super Admin</option>
             <option value="ADMIN">Admin</option>
@@ -57,8 +57,12 @@
           </select>
         </div>
         <div class="select-wrapper">
+          <i class="fas fa-building"></i>
+          <input v-model="organizationId" type="text" placeholder="UUID Organisation..." class="input-inline" @input="onFilterChange" />
+        </div>
+        <div class="select-wrapper">
           <i class="fas fa-toggle-on"></i>
-          <select v-model="selectedStatus">
+          <select v-model="selectedStatus" @change="onFilterChange">
             <option value="ALL">Tous les statuts</option>
             <option value="ACTIVE">Actifs</option>
             <option value="INACTIVE">Inactifs</option>
@@ -75,7 +79,7 @@
 
     <!-- Users Table -->
     <div v-else class="table-wrapper-premium">
-      <div v-if="filteredUsers.length === 0" class="empty-state-premium">
+      <div v-if="users.length === 0" class="empty-state-premium">
         <div class="empty-icon"><i class="fas fa-users-slash"></i></div>
         <h3>Aucun utilisateur trouvé</h3>
         <p>Ajustez vos filtres ou termes de recherche.</p>
@@ -95,10 +99,10 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="user in filteredUsers" :key="user.id" :class="{ 'row-inactive': !user.isActive }">
+          <tr v-for="user in users" :key="user.id" :class="{ 'row-inactive': user.isActive === false }">
             <td>
               <div class="user-cell">
-                <div :class="['avatar-circle', !user.isActive && 'avatar-inactive']">
+                <div :class="['avatar-circle', user.isActive === false && 'avatar-inactive']">
                   {{ user.firstName?.[0] || '' }}{{ user.lastName?.[0] || '' }}
                 </div>
                 <div class="user-details">
@@ -122,8 +126,8 @@
             </td>
             <td>
               <div class="status-cell">
-                <span :class="['pulse-dot', user.isActive ? 'active' : 'inactive']"></span>
-                <span class="status-text">{{ user.isActive ? 'Actif' : 'Inactif' }}</span>
+                <span :class="['pulse-dot', user.isActive !== false ? 'active' : 'inactive']"></span>
+                <span class="status-text">{{ user.isActive !== false ? 'Actif' : 'Inactif' }}</span>
               </div>
             </td>
             <td><span class="date-text">{{ formatDate(user.createdAt) }}</span></td>
@@ -131,19 +135,54 @@
             <td>
               <button
                 v-if="user.role !== 'SUPER_ADMIN'"
-                :class="['action-toggle-btn', user.isActive ? 'btn-deactivate' : 'btn-reactivate']"
+                :class="['action-toggle-btn', user.isActive !== false ? 'btn-deactivate' : 'btn-reactivate']"
                 @click="handleToggleUser(user)"
                 :disabled="toggleLoading === user.id"
-                :title="user.isActive ? 'Désactiver ce compte' : 'Réactiver ce compte'"
+                :title="user.isActive !== false ? 'Désactiver ce compte' : 'Réactiver ce compte'"
               >
-                <i :class="user.isActive ? 'fas fa-user-slash' : 'fas fa-user-check'"></i>
-                {{ user.isActive ? 'Désactiver' : 'Réactiver' }}
+                <i :class="user.isActive !== false ? 'fas fa-user-slash' : 'fas fa-user-check'"></i>
+                {{ user.isActive !== false ? 'Désactiver' : 'Réactiver' }}
               </button>
               <span v-else class="text-muted" style="font-size:0.75rem">— protégé</span>
             </td>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Pagination Premium -->
+    <div v-if="totalElements > pageSize" class="pagination-premium-container mt-12">
+      <div class="pagination-info">
+        Affichage de <strong>{{ pagedFrom }} - {{ pagedTo }}</strong> sur <strong>{{ totalElements }}</strong> utilisateurs
+      </div>
+      <div class="pagination-controls">
+        <button 
+          class="btn-page-step" 
+          :disabled="currentPage === 1"
+          @click="currentPage--; fetchUsers()"
+        >
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <div class="page-numbers">
+          <button 
+            v-for="p in totalPages" 
+            :key="p"
+            :class="['btn-page-num', { active: currentPage === p }]"
+            @click="currentPage = p; fetchUsers()"
+          >
+            {{ p }}
+          </button>
+        </div>
+
+        <button 
+          class="btn-page-step" 
+          :disabled="currentPage === totalPages"
+          @click="currentPage++; fetchUsers()"
+        >
+          <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -201,24 +240,85 @@ export default {
     const isLoading = ref(true);
     const searchQuery = ref('');
     const selectedRole = ref('ALL');
+    const organizationId = ref('');
     const selectedStatus = ref('ALL');
     const toggleLoading = ref(null);
+
+    // Pagination State
+    const currentPage = ref(1);
+    const pageSize = ref(10);
+    const totalPages = ref(1);
+    const totalElements = ref(0);
+
+    const pagedFrom = computed(() => (currentPage.value - 1) * pageSize.value + 1);
+    const pagedTo = computed(() => Math.min(currentPage.value * pageSize.value, totalElements.value));
 
     const fetchUsers = async () => {
       isLoading.value = true;
       try {
-        const res = await adminApi.getUsers();
-        if (res.success) {
-          users.value = res.data;
+        const params = {
+          page: currentPage.value - 1,
+          size: pageSize.value,
+          search: searchQuery.value,
+          role: selectedRole.value === 'ALL' ? '' : selectedRole.value,
+          organizationId: organizationId.value,
+          isActive: selectedStatus.value === 'ALL' ? '' : (selectedStatus.value === 'ACTIVE' ? 'true' : 'false')
+        };
+        const res = await adminApi.getUsers(params);
+        if (res.success && res.data) {
+          if (Array.isArray(res.data)) {
+            // Raw array fallback
+            const filtered = res.data.filter(u => {
+              const nameQuery = searchQuery.value.toLowerCase().trim();
+              const matchesSearch = nameQuery === '' ||
+                (u.firstName + ' ' + u.lastName).toLowerCase().includes(nameQuery) ||
+                (u.email || '').toLowerCase().includes(nameQuery) ||
+                u.phone.includes(nameQuery);
+
+              const matchesRole = selectedRole.value === 'ALL' || u.role === selectedRole.value;
+              const matchesStatus = selectedStatus.value === 'ALL' ||
+                (selectedStatus.value === 'ACTIVE' ? u.isActive !== false : u.isActive === false);
+
+              return matchesSearch && matchesRole && matchesStatus;
+            });
+            users.value = filtered.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value);
+            totalElements.value = filtered.length;
+            totalPages.value = Math.ceil(filtered.length / pageSize.value) || 1;
+          } else {
+            // Spring Page object
+            users.value = res.data.content || [];
+            totalPages.value = res.data.totalPages || 1;
+            totalElements.value = res.data.totalElements || 0;
+          }
         } else {
-          users.value = MOCK_USERS;
+          // Mock data fallback
+          const filtered = MOCK_USERS.filter(u => {
+            const nameQuery = searchQuery.value.toLowerCase().trim();
+            const matchesSearch = nameQuery === '' ||
+              (u.firstName + ' ' + u.lastName).toLowerCase().includes(nameQuery);
+            return matchesSearch;
+          });
+          users.value = filtered.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value);
+          totalElements.value = filtered.length;
+          totalPages.value = Math.ceil(filtered.length / pageSize.value) || 1;
         }
       } catch (error) {
         console.error('Error fetching users, using mock data...', error);
-        users.value = MOCK_USERS;
+        const filtered = MOCK_USERS.filter(u => {
+          const nameQuery = searchQuery.value.toLowerCase().trim();
+          return nameQuery === '' || (u.firstName + ' ' + u.lastName).toLowerCase().includes(nameQuery);
+        });
+        users.value = filtered.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value);
+        totalElements.value = filtered.length;
+        totalPages.value = Math.ceil(filtered.length / pageSize.value) || 1;
       } finally {
         isLoading.value = false;
       }
+    };
+
+    const onFilterChange = () => {
+      currentPage.value = 1;
+      fetchUsers();
     };
 
     const handleToggleUser = async (user) => {
@@ -238,27 +338,11 @@ export default {
 
     const stats = computed(() => {
       return {
-        total: users.value.length,
+        total: totalElements.value || users.value.length,
         superAdmins: users.value.filter(u => u.role === 'SUPER_ADMIN').length,
         admins: users.value.filter(u => u.role === 'ADMIN').length,
-        active: users.value.filter(u => u.isActive).length
+        active: users.value.filter(u => u.isActive !== false).length
       };
-    });
-
-    const filteredUsers = computed(() => {
-      return users.value.filter(u => {
-        const nameQuery = searchQuery.value.toLowerCase().trim();
-        const matchesSearch = nameQuery === '' ||
-          (u.firstName + ' ' + u.lastName).toLowerCase().includes(nameQuery) ||
-          (u.email || '').toLowerCase().includes(nameQuery) ||
-          u.phone.includes(nameQuery);
-
-        const matchesRole = selectedRole.value === 'ALL' || u.role === selectedRole.value;
-        const matchesStatus = selectedStatus.value === 'ALL' ||
-          (selectedStatus.value === 'ACTIVE' ? u.isActive : !u.isActive);
-
-        return matchesSearch && matchesRole && matchesStatus;
-      });
     });
 
     const formatDate = (dateStr) => {
@@ -271,14 +355,72 @@ export default {
     onMounted(fetchUsers);
 
     return {
-      users, isLoading, searchQuery, selectedRole, selectedStatus,
-      stats, filteredUsers, formatDate, toggleLoading, handleToggleUser
+      users, isLoading, searchQuery, selectedRole, organizationId, selectedStatus,
+      stats, formatDate, toggleLoading, handleToggleUser,
+      currentPage, pageSize, totalPages, totalElements, pagedFrom, pagedTo, onFilterChange, fetchUsers
     };
   }
 };
 </script>
 
 <style scoped>
+.pagination-premium-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2.5rem;
+  background: white;
+  border-radius: 1.5rem;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+}
+
+.pagination-info { font-size: 0.9rem; color: var(--text-muted); }
+.pagination-info strong { color: var(--text-main); }
+
+.pagination-controls { display: flex; align-items: center; gap: 1rem; }
+.page-numbers { display: flex; gap: 0.5rem; }
+
+.btn-page-step, .btn-page-num {
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-surface-dim);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.3s;
+  color: var(--text-muted);
+}
+
+.btn-page-step:hover:not(:disabled), .btn-page-num:hover {
+  background: white;
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.btn-page-num.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.btn-page-step:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.input-inline {
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
+  width: 100px;
+}
+
 .users-manager-viewport {
   width: 100%;
   min-height: 100%;

@@ -37,12 +37,32 @@
     <div class="filter-bar mb-6">
       <div class="search-box">
         <i class="fas fa-search"></i>
-        <input v-model="searchQuery" type="text" placeholder="Rechercher par nom d'entreprise, email, RCCM..." />
+        <input v-model="searchQuery" type="text" placeholder="Rechercher par nom d'entreprise, email, RCCM..." @input="onFilterChange" />
       </div>
       <div class="filters-group">
         <div class="select-wrapper">
+          <i class="fas fa-filter"></i>
+          <select v-model="clientType" @change="onFilterChange">
+            <option value="ALL">Tous les types</option>
+            <option value="MOBILE">Client Mobile</option>
+            <option value="PARTNER">Client Partenaire</option>
+          </select>
+        </div>
+        <div class="select-wrapper">
+          <i class="fas fa-network-wired"></i>
+          <input v-model="parentId" type="text" placeholder="UUID Parent..." class="input-inline" @input="onFilterChange" />
+        </div>
+        <div class="select-wrapper">
+          <i class="fas fa-toggle-on"></i>
+          <select v-model="selectedStatus" @change="onFilterChange">
+            <option value="ALL">Tous les statuts</option>
+            <option value="ACTIVE">Actifs</option>
+            <option value="SUSPENDED">Suspendus</option>
+          </select>
+        </div>
+        <div class="select-wrapper">
           <i class="fas fa-globe"></i>
-          <select v-model="selectedCountry">
+          <select v-model="selectedCountry" @change="onFilterChange">
             <option value="ALL">Tous les pays</option>
             <option value="CI">Côte d'Ivoire (CI)</option>
             <option value="SN">Sénégal (SN)</option>
@@ -60,7 +80,7 @@
 
     <!-- Clients Table -->
     <div v-else class="table-wrapper-premium">
-      <div v-if="filteredClients.length === 0" class="empty-state-premium">
+      <div v-if="clients.length === 0" class="empty-state-premium">
         <div class="empty-icon"><i class="fas fa-store-slash"></i></div>
         <h3>Aucune organisation trouvée</h3>
         <p>Ajustez vos filtres ou termes de recherche.</p>
@@ -79,10 +99,10 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="client in filteredClients" :key="client.id" :class="{ 'row-suspended': !client.isActive }">
+          <tr v-for="client in clients" :key="client.id" :class="{ 'row-suspended': client.isActive === false }">
             <td>
               <div class="client-cell">
-                <div :class="['avatar-square', !client.isActive && 'avatar-suspended']">
+                <div :class="['avatar-square', client.isActive === false && 'avatar-suspended']">
                   {{ client.name?.[0] || 'C' }}
                 </div>
                 <div class="client-details">
@@ -141,6 +161,41 @@
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Pagination Premium -->
+    <div v-if="totalElements > pageSize" class="pagination-premium-container mt-12">
+      <div class="pagination-info">
+        Affichage de <strong>{{ pagedFrom }} - {{ pagedTo }}</strong> sur <strong>{{ totalElements }}</strong> clients
+      </div>
+      <div class="pagination-controls">
+        <button 
+          class="btn-page-step" 
+          :disabled="currentPage === 1"
+          @click="currentPage--; fetchClients()"
+        >
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <div class="page-numbers">
+          <button 
+            v-for="p in totalPages" 
+            :key="p"
+            :class="['btn-page-num', { active: currentPage === p }]"
+            @click="currentPage = p; fetchClients()"
+          >
+            {{ p }}
+          </button>
+        </div>
+
+        <button 
+          class="btn-page-step" 
+          :disabled="currentPage === totalPages"
+          @click="currentPage++; fetchClients()"
+        >
+          <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
     </div>
 
     <!-- Suspend Modal -->
@@ -228,26 +283,88 @@ export default {
     const clients = ref([]);
     const isLoading = ref(true);
     const searchQuery = ref('');
-    const selectedPlan = ref('ALL');
     const selectedCountry = ref('ALL');
+    const clientType = ref('ALL');
+    const parentId = ref('');
+    const selectedStatus = ref('ALL');
     const actionLoading = ref(null);
     const suspendModal = ref({ show: false, client: null, reason: '' });
+
+    // Pagination State
+    const currentPage = ref(1);
+    const pageSize = ref(10);
+    const totalPages = ref(1);
+    const totalElements = ref(0);
+
+    const pagedFrom = computed(() => (currentPage.value - 1) * pageSize.value + 1);
+    const pagedTo = computed(() => Math.min(currentPage.value * pageSize.value, totalElements.value));
 
     const fetchClients = async () => {
       isLoading.value = true;
       try {
-        const res = await adminApi.getClients();
-        if (res.success) {
-          clients.value = res.data;
+        const params = {
+          page: currentPage.value - 1,
+          size: pageSize.value,
+          search: searchQuery.value,
+          isActive: selectedStatus.value === 'ALL' ? '' : (selectedStatus.value === 'ACTIVE' ? 'true' : 'false'),
+          parentId: parentId.value,
+          clientType: clientType.value === 'ALL' ? '' : clientType.value
+        };
+        const res = await adminApi.getClients(params);
+        if (res.success && res.data) {
+          if (Array.isArray(res.data)) {
+            // Raw array fallback
+            const filtered = res.data.filter(c => {
+              const nameQuery = searchQuery.value.toLowerCase().trim();
+              const matchesSearch = nameQuery === '' ||
+                c.name.toLowerCase().includes(nameQuery) ||
+                (c.email || '').toLowerCase().includes(nameQuery) ||
+                (c.taxId || '').toLowerCase().includes(nameQuery);
+              
+              const matchesCountry = selectedCountry.value === 'ALL' || c.country === selectedCountry.value;
+              const matchesStatus = selectedStatus.value === 'ALL' || 
+                (selectedStatus.value === 'ACTIVE' ? c.isActive !== false : c.isActive === false);
+              
+              return matchesSearch && matchesCountry && matchesStatus;
+            });
+            clients.value = filtered.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value);
+            totalElements.value = filtered.length;
+            totalPages.value = Math.ceil(filtered.length / pageSize.value) || 1;
+          } else {
+            // Spring Page object
+            clients.value = res.data.content || [];
+            totalPages.value = res.data.totalPages || 1;
+            totalElements.value = res.data.totalElements || 0;
+          }
         } else {
-          clients.value = MOCK_CLIENTS;
+          // Mock data fallback
+          const filtered = MOCK_CLIENTS.filter(c => {
+            const nameQuery = searchQuery.value.toLowerCase().trim();
+            const matchesSearch = nameQuery === '' ||
+              c.name.toLowerCase().includes(nameQuery);
+            return matchesSearch;
+          });
+          clients.value = filtered.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value);
+          totalElements.value = filtered.length;
+          totalPages.value = Math.ceil(filtered.length / pageSize.value) || 1;
         }
       } catch (error) {
         console.error('Error fetching clients, using mock data...', error);
-        clients.value = MOCK_CLIENTS;
+        const filtered = MOCK_CLIENTS.filter(c => {
+          const nameQuery = searchQuery.value.toLowerCase().trim();
+          return nameQuery === '' || c.name.toLowerCase().includes(nameQuery);
+        });
+        clients.value = filtered.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value);
+        totalElements.value = filtered.length;
+        totalPages.value = Math.ceil(filtered.length / pageSize.value) || 1;
       } finally {
         isLoading.value = false;
       }
+    };
+
+    const onFilterChange = () => {
+      currentPage.value = 1;
+      fetchClients();
     };
 
     const openSuspendModal = (client) => {
@@ -289,26 +406,10 @@ export default {
 
     const stats = computed(() => {
       return {
-        total: clients.value.length,
+        total: totalElements.value || clients.value.length,
         formal: clients.value.filter(c => c.type === 'FORMAL').length,
-        paying: clients.value.filter(c => c.activePlanType && c.activePlanType !== 'FREE').length,
         trackStock: clients.value.filter(c => c.trackStock).length
       };
-    });
-
-    const filteredClients = computed(() => {
-      return clients.value.filter(c => {
-        const nameQuery = searchQuery.value.toLowerCase().trim();
-        const matchesSearch = nameQuery === '' ||
-          c.name.toLowerCase().includes(nameQuery) ||
-          (c.email || '').toLowerCase().includes(nameQuery) ||
-          (c.taxId || '').toLowerCase().includes(nameQuery);
-
-        const matchesPlan = selectedPlan.value === 'ALL' || c.activePlanType === selectedPlan.value;
-        const matchesCountry = selectedCountry.value === 'ALL' || c.country === selectedCountry.value;
-
-        return matchesSearch && matchesPlan && matchesCountry;
-      });
     });
 
     const formatDate = (dateStr) => {
@@ -328,8 +429,9 @@ export default {
     onMounted(fetchClients);
 
     return {
-      clients, isLoading, searchQuery, selectedPlan, selectedCountry,
-      stats, filteredClients, formatDate, formatActivityDate,
+      clients, isLoading, searchQuery, selectedCountry, clientType, parentId, selectedStatus,
+      stats, formatDate, formatActivityDate, currentPage, pageSize, totalPages, totalElements,
+      pagedFrom, pagedTo, onFilterChange, fetchClients,
       actionLoading, suspendModal, openSuspendModal, handleSuspend, handleActivate
     };
   }
@@ -337,6 +439,63 @@ export default {
 </script>
 
 <style scoped>
+.pagination-premium-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2.5rem;
+  background: white;
+  border-radius: 1.5rem;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+}
+
+.pagination-info { font-size: 0.9rem; color: var(--text-muted); }
+.pagination-info strong { color: var(--text-main); }
+
+.pagination-controls { display: flex; align-items: center; gap: 1rem; }
+.page-numbers { display: flex; gap: 0.5rem; }
+
+.btn-page-step, .btn-page-num {
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-surface-dim);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.3s;
+  color: var(--text-muted);
+}
+
+.btn-page-step:hover:not(:disabled), .btn-page-num:hover {
+  background: white;
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.btn-page-num.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.btn-page-step:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.input-inline {
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
+  width: 100px;
+}
+
 .clients-manager-viewport {
   width: 100%;
   min-height: 100%;

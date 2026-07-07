@@ -229,17 +229,39 @@ class AdminApiService {
     }
 
     /**
-     * Liste de tous les utilisateurs du système
+     * Liste de tous les utilisateurs du système avec filtres et pagination
      */
-    async getUsers() {
-        return api.request('/api/admin/users');
+    async getUsers(params = {}) {
+        const queryString = new URLSearchParams();
+        if (params.page !== undefined) queryString.append('page', params.page);
+        if (params.size !== undefined) queryString.append('size', params.size);
+        if (params.sort !== undefined) queryString.append('sort', params.sort);
+        if (params.search) queryString.append('search', params.search);
+        if (params.role && params.role !== 'ALL') queryString.append('role', params.role);
+        if (params.organizationId) queryString.append('organizationId', params.organizationId);
+        if (params.isActive !== undefined && params.isActive !== null && params.isActive !== '' && params.isActive !== 'ALL') {
+            queryString.append('isActive', params.isActive);
+        }
+        const qs = queryString.toString();
+        return api.request(`/api/admin/users${qs ? '?' + qs : ''}`);
     }
 
     /**
-     * Liste de tous les clients (organisations)
+     * Liste de tous les clients (organisations) avec filtres et pagination
      */
-    async getClients() {
-        return api.request('/api/admin/clients');
+    async getClients(params = {}) {
+        const queryString = new URLSearchParams();
+        if (params.page !== undefined) queryString.append('page', params.page);
+        if (params.size !== undefined) queryString.append('size', params.size);
+        if (params.sort !== undefined) queryString.append('sort', params.sort);
+        if (params.search) queryString.append('search', params.search);
+        if (params.isActive !== undefined && params.isActive !== null && params.isActive !== '' && params.isActive !== 'ALL') {
+            queryString.append('isActive', params.isActive);
+        }
+        if (params.parentId) queryString.append('parentId', params.parentId);
+        if (params.clientType && params.clientType !== 'ALL') queryString.append('clientType', params.clientType);
+        const qs = queryString.toString();
+        return api.request(`/api/admin/clients${qs ? '?' + qs : ''}`);
     }
 
     /**
