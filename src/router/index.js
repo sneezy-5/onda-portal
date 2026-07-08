@@ -15,6 +15,7 @@ import AdminBanks from '../views/admin/BanksManager.vue';
 import AdminOpportunities from '../views/admin/OpportunitiesManager.vue';
 import AdminUsers from '../views/admin/UsersManager.vue';
 import AdminClients from '../views/admin/ClientsManager.vue';
+import AdminPartnerOrgs from '../views/admin/PartnerOrgsManager.vue';
 
 const routes = [
   {
@@ -78,6 +79,11 @@ const routes = [
         path: 'clients',
         name: 'AdminClients',
         component: AdminClients
+      },
+      {
+        path: 'partners/:id/organizations',
+        name: 'AdminPartnerOrgs',
+        component: AdminPartnerOrgs
       }
     ]
   },

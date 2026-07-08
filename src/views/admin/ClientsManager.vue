@@ -179,127 +179,7 @@
       </div>
     </div>
 
-    <!-- Partner Organizations Modal -->
-    <div v-if="orgsModal.show" class="modal-backdrop" @click.self="orgsModal.show = false">
-      <div class="modal-box premium-modal-large animate-slide-up">
-        <div class="modal-header">
-          <h3>Organisations de {{ orgsModal.partner?.name }}</h3>
-          <button class="btn-close" @click="orgsModal.show = false"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-          <div class="organizations-filter mb-4 flex justify-between items-center gap-4">
-            <p class="modal-desc mb-0">Ce partenaire gère <strong>{{ orgsModal.organizations.length }}</strong> organisation(s) :</p>
-            <div class="select-wrapper">
-              <i class="fas fa-globe"></i>
-              <select v-model="orgsModal.selectedCountryFilter">
-                <option value="ALL">Tous les pays</option>
-                <option value="CI">Côte d'Ivoire (CI)</option>
-                <option value="SN">Sénégal (SN)</option>
-                <option value="BF">Burkina Faso (BF)</option>
-                <option value="ML">Mali (ML)</option>
-                <option value="BJ">Bénin (BJ)</option>
-                <option value="TG">Togo (TG)</option>
-                <option value="GN">Guinée (GN)</option>
-                <option value="NE">Niger (NE)</option>
-                <option value="GH">Ghana (GH)</option>
-                <option value="NG">Nigéria (NG)</option>
-                <option value="CM">Cameroun (CM)</option>
-                <option value="CG">Congo (CG)</option>
-                <option value="GA">Gabon (GA)</option>
-              </select>
-            </div>
-          </div>
 
-          <div v-if="orgsModal.isLoading" class="modal-loading py-8 flex flex-col items-center">
-            <div class="spinner-elite"></div>
-            <p class="text-muted mt-2">Chargement des organisations...</p>
-          </div>
-
-          <div v-else class="modal-table-container">
-            <div v-if="filteredModalOrganizations.length === 0" class="empty-state-modal text-center py-8">
-              <i class="fas fa-building text-slate-300 text-3xl mb-2"></i>
-              <p class="text-muted">Aucune organisation correspondante</p>
-            </div>
-            
-            <table v-else class="table-premium table-modal">
-              <thead>
-                <tr>
-                  <th>Organisation</th>
-                  <th>Contact</th>
-                  <th>Pays</th>
-                  <th>Plan & Statut</th>
-                  <th>Compte</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="org in filteredModalOrganizations" :key="org.id" :class="{ 'row-suspended': org.isActive === false }">
-                  <td>
-                    <div class="client-cell">
-                      <div class="org-icon-avatar bg-slate-100 text-slate-700">
-                        {{ org.name?.[0]?.toUpperCase() || 'O' }}
-                      </div>
-                      <div class="client-details">
-                        <span class="client-name font-semibold text-sm">{{ org.name }}</span>
-                        <span class="client-sub text-xs">{{ org.legalForm || 'Non Spécifié' }} · RCCM: {{ org.taxId || 'Aucun' }}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="contact-cell">
-                      <span class="contact-phone text-xs font-mono">{{ org.phone || '—' }}</span>
-                      <span class="contact-email text-xs text-muted">{{ org.email || '—' }}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span class="country-badge text-xs">
-                      {{ org.country || 'CI' }}
-                    </span>
-                  </td>
-                  <td>
-                    <div class="plan-cell flex flex-col">
-                      <span class="plan-name text-xs font-bold text-sky-600">{{ org.activePlanName }}</span>
-                      <span class="plan-status text-[10px] text-muted">{{ org.activeSubscriptionStatus }}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span :class="['account-badge text-xs', org.isActive !== false ? 'account-active' : 'account-suspended']">
-                      {{ org.isActive !== false ? 'Actif' : 'Suspendu' }}
-                    </span>
-                    <div v-if="org.suspendedReason" class="suspend-reason text-[10px] text-red-500">{{ org.suspendedReason }}</div>
-                  </td>
-                  <td>
-                    <div class="actions-cell">
-                      <button
-                        v-if="org.isActive !== false"
-                        class="action-btn btn-suspend text-xs"
-                        @click="openSuspendModal(org, 'organization')"
-                        :disabled="actionLoading === org.id"
-                        title="Suspendre cette organisation"
-                      >
-                        <i class="fas fa-ban"></i>
-                      </button>
-                      <button
-                        v-else
-                        class="action-btn btn-activate text-xs"
-                        @click="handleActivateOrganization(org)"
-                        :disabled="actionLoading === org.id"
-                        title="Réactiver cette organisation"
-                      >
-                        <i class="fas fa-check-circle"></i>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn-ghost" @click="orgsModal.show = false">Fermer</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Suspend Modal -->
     <div v-if="suspendModal.show" class="modal-backdrop" @click.self="suspendModal.show = false">
@@ -328,6 +208,7 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import adminApi from '../../services/adminApi';
 
 const MOCK_PARTNERS = [
@@ -356,6 +237,7 @@ const MOCK_PARTNERS = [
 export default {
   name: 'ClientsManager',
   setup() {
+    const router = useRouter();
     const partners = ref([]);
     const isLoading = ref(true);
     const searchQuery = ref('');
@@ -365,14 +247,7 @@ export default {
     // Suspend Modal state (can target partner or organization)
     const suspendModal = ref({ show: false, type: 'partner', target: null, reason: '' });
 
-    // Organizations Modal state
-    const orgsModal = ref({
-      show: false,
-      partner: null,
-      organizations: [],
-      isLoading: false,
-      selectedCountryFilter: 'ALL'
-    });
+
 
     // Pagination State
     const currentPage = ref(1);
@@ -452,7 +327,7 @@ export default {
     };
 
     const handleConfirmSuspend = async () => {
-      const { type, target, reason } = suspendModal.value;
+      const { type, target } = suspendModal.value;
       if (!target) return;
       actionLoading.value = target.id;
       try {
@@ -462,17 +337,6 @@ export default {
           const idx = partners.value.findIndex(p => p.id === target.id);
           if (idx !== -1) {
             partners.value[idx] = { ...partners.value[idx], isActive: false };
-          }
-        } else {
-          // Suspend Organization
-          await adminApi.suspendClient(target.id, reason);
-          const idx = orgsModal.value.organizations.findIndex(o => o.id === target.id);
-          if (idx !== -1) {
-            orgsModal.value.organizations[idx] = { 
-              ...orgsModal.value.organizations[idx], 
-              isActive: false, 
-              suspendedReason: reason || "Suspendu par l'administrateur" 
-            };
           }
         }
         suspendModal.value.show = false;
@@ -498,50 +362,11 @@ export default {
       }
     };
 
-    const handleActivateOrganization = async (org) => {
-      actionLoading.value = org.id;
-      try {
-        await adminApi.activateClient(org.id);
-        const idx = orgsModal.value.organizations.findIndex(o => o.id === org.id);
-        if (idx !== -1) {
-          orgsModal.value.organizations[idx] = { 
-            ...orgsModal.value.organizations[idx], 
-            isActive: true, 
-            suspendedReason: null 
-          };
-        }
-      } catch (e) {
-        console.error('Erreur activation organisation:', e);
-      } finally {
-        actionLoading.value = null;
-      }
+    const openOrganizationsModal = (partner) => {
+      router.push({ name: 'AdminPartnerOrgs', params: { id: partner.id } });
     };
 
-    const openOrganizationsModal = async (partner) => {
-      orgsModal.value.show = true;
-      orgsModal.value.partner = partner;
-      orgsModal.value.organizations = [];
-      orgsModal.value.isLoading = true;
-      orgsModal.value.selectedCountryFilter = 'ALL';
-      try {
-        const res = await adminApi.getPartnerOrganizations(partner.id);
-        if (res.success && res.data) {
-          orgsModal.value.organizations = res.data;
-        }
-      } catch (e) {
-        console.error('Erreur chargement organisations partenaire:', e);
-      } finally {
-        orgsModal.value.isLoading = false;
-      }
-    };
 
-    const filteredModalOrganizations = computed(() => {
-      const filter = orgsModal.value.selectedCountryFilter;
-      if (filter === 'ALL') {
-        return orgsModal.value.organizations;
-      }
-      return orgsModal.value.organizations.filter(o => o.country === filter);
-    });
 
     const stats = computed(() => {
       return {
@@ -572,7 +397,7 @@ export default {
       stats, formatDate, formatActivityDate, currentPage, pageSize, totalPages, totalElements,
       pagedFrom, pagedTo, onFilterChange, fetchPartners,
       actionLoading, suspendModal, openSuspendModal, handleConfirmSuspend, handleActivatePartner,
-      orgsModal, openOrganizationsModal, filteredModalOrganizations, handleActivateOrganization
+      openOrganizationsModal
     };
   }
 };
