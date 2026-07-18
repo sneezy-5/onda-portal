@@ -15,6 +15,7 @@ class AdminApiService {
         if (params.category && params.category !== 'ALL') qs.append('category', params.category);
         if (params.source && params.source !== 'ALL') qs.append('source', params.source);
         if (params.status && params.status !== 'ALL') qs.append('status', params.status);
+        if (params.env && params.env !== 'ALL') qs.append('env', params.env);
         if (params.limit) qs.append('limit', params.limit);
         const s = qs.toString();
         return api.request(`/api/admin/documents${s ? '?' + s : ''}`);

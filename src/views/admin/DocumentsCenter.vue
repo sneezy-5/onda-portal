@@ -22,6 +22,11 @@
         <option value="PARTENAIRE">Partenaires</option>
         <option value="MOBILE">Mobile (direct)</option>
       </select>
+      <select v-model="filters.env" @change="load">
+        <option value="all">Tous environnements</option>
+        <option value="production">Production</option>
+        <option value="sandbox">Sandbox (partenaires)</option>
+      </select>
       <select v-model="filters.status" @change="load">
         <option value="ALL">Tous statuts</option>
         <option value="PENDING">En attente</option>
@@ -47,6 +52,7 @@
           <div class="dc-badges">
             <span class="badge cat" :class="d.category">{{ d.categoryLabel }}</span>
             <span class="badge src" :class="d.source">{{ d.source }}</span>
+            <span v-if="d.environment === 'sandbox'" class="badge env">SANDBOX</span>
           </div>
           <div class="dc-org">{{ d.organizationName || '—' }}</div>
           <div v-if="d.partnerName" class="dc-partner">via {{ d.partnerName }}</div>
@@ -79,7 +85,7 @@ const docs = ref([]);
 const images = reactive({});   // fileId -> objectURL
 const loading = ref(false);
 const selected = ref(null);
-const filters = reactive({ category: 'ALL', source: 'ALL', status: 'ALL' });
+const filters = reactive({ category: 'ALL', source: 'ALL', status: 'ALL', env: 'all' });
 
 const statusClass = (s) => {
   if (!s) return '';
@@ -145,6 +151,7 @@ onBeforeUnmount(revokeAll);
 .badge.cat.BANQUE { background: #dbeafe; color: #1d4ed8; }
 .badge.src { background: #f3f4f6; color: #374151; }
 .badge.src.PARTENAIRE { background: #fae8ff; color: #a21caf; }
+.badge.env { background: #fef3c7; color: #b45309; }
 .dc-org { font-weight: 700; font-size: 14px; color: #111827; }
 .dc-partner { font-size: 11px; color: #6b7280; margin-top: 2px; }
 .dc-status { margin-top: 8px; font-size: 11px; font-weight: 700; display: inline-block; padding: 2px 8px; border-radius: 6px; background: #f3f4f6; color: #374151; }
