@@ -76,6 +76,20 @@
               <span class="btn-label">Audit Fiscal</span>
               <span v-if="auditCount > 0" class="nav-badge-count">{{ auditCount }}</span>
             </router-link>
+
+            <router-link :to="{ name: 'AdminPatrimony' }" class="nav-btn-elite" active-class="active">
+              <div class="btn-visual">
+                <i class="btn-icon fas fa-gem"></i>
+              </div>
+              <span class="btn-label">Certif. Patrimoine</span>
+            </router-link>
+
+            <router-link :to="{ name: 'AdminDocuments' }" class="nav-btn-elite" active-class="active">
+              <div class="btn-visual">
+                <i class="btn-icon fas fa-images"></i>
+              </div>
+              <span class="btn-label">Documents</span>
+            </router-link>
           </div>
 
           <div class="nav-cluster mt-8">

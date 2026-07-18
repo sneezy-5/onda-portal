@@ -16,6 +16,8 @@ import AdminOpportunities from '../views/admin/OpportunitiesManager.vue';
 import AdminUsers from '../views/admin/UsersManager.vue';
 import AdminClients from '../views/admin/ClientsManager.vue';
 import AdminPartnerOrgs from '../views/admin/PartnerOrgsManager.vue';
+import AdminDocuments from '../views/admin/DocumentsCenter.vue';
+import AdminPatrimony from '../views/admin/PatrimonyQueue.vue';
 
 const routes = [
   {
@@ -54,6 +56,16 @@ const routes = [
         path: 'audit',
         name: 'AdminAudit',
         component: AdminAudit
+      },
+      {
+        path: 'documents',
+        name: 'AdminDocuments',
+        component: AdminDocuments
+      },
+      {
+        path: 'patrimony',
+        name: 'AdminPatrimony',
+        component: AdminPatrimony
       },
       {
         path: 'maintenance',

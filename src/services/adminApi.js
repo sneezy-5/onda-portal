@@ -1,8 +1,60 @@
-import api from './api';
+import api, { API_BASE_URL } from './api';
 
 class AdminApiService {
     constructor() {
         this.api = api;
+    }
+
+    // =========================================================
+    // Centre de documents (/api/admin/documents)
+    // =========================================================
+
+    /** Liste des images de preuve, filtrables par catégorie / source / statut. */
+    async getDocuments(params = {}) {
+        const qs = new URLSearchParams();
+        if (params.category && params.category !== 'ALL') qs.append('category', params.category);
+        if (params.source && params.source !== 'ALL') qs.append('source', params.source);
+        if (params.status && params.status !== 'ALL') qs.append('status', params.status);
+        if (params.limit) qs.append('limit', params.limit);
+        const s = qs.toString();
+        return api.request(`/api/admin/documents${s ? '?' + s : ''}`);
+    }
+
+    /**
+     * Charge une image protégée (nécessite le token admin) et renvoie une object-URL
+     * utilisable dans <img :src>. À révoquer avec URL.revokeObjectURL après usage.
+     */
+    async fetchImageObjectUrl(pathOrUrl) {
+        const url = pathOrUrl.startsWith('http') ? pathOrUrl : `${API_BASE_URL}${pathOrUrl}`;
+        const headers = {};
+        if (api.token) headers['Authorization'] = `Bearer ${api.token}`;
+        const res = await fetch(url, { headers });
+        if (!res.ok) throw new Error(`Image ${res.status}`);
+        const blob = await res.blob();
+        return URL.createObjectURL(blob);
+    }
+
+    // =========================================================
+    // Certification du patrimoine (/api/admin/patrimony)
+    // =========================================================
+
+    /** File d'attente : stock / biens / capital / comptes bancaires à certifier. */
+    async getPendingPatrimony() {
+        return api.request('/api/admin/patrimony/pending');
+    }
+
+    /** Certifie une preuve de patrimoine. type = stock|asset|equity|bank */
+    async certifyPatrimony(type, id, notes = '') {
+        return api.request(`/api/admin/patrimony/${type}/${id}/certify?notes=${encodeURIComponent(notes)}`, {
+            method: 'POST'
+        });
+    }
+
+    /** Rejette une preuve de patrimoine. type = stock|asset|equity|bank */
+    async rejectPatrimony(type, id, reason = '') {
+        return api.request(`/api/admin/patrimony/${type}/${id}/reject?reason=${encodeURIComponent(reason)}`, {
+            method: 'POST'
+        });
     }
     /**
      * Authentification Administrateur

@@ -309,12 +309,26 @@ export default {
 
     const hasImageError = (url) => !!imageErrors[url];
 
+    // Images KYC protégées (token admin) → chargées en blob, keyées par chemin résolu.
+    const blobUrls = reactive({});
+
+    const loadBlobs = async (item) => {
+      if (!item) return;
+      const paths = [item.documentFrontUrl, item.documentBackUrl, item.selfieUrl, item.selfieWithIdUrl]
+        .map(resolveUrl).filter(Boolean);
+      for (const p of paths) {
+        if (blobUrls[p]) continue;
+        try { blobUrls[p] = await adminApi.fetchImageObjectUrl(p); }
+        catch (e) { setImageError(p); }
+      }
+    };
+
     const docs = (item) => [
-      { label: 'CNI Recto', url: resolveUrl(item.documentFrontUrl) },
-      { label: 'CNI Verso', url: resolveUrl(item.documentBackUrl) },
-      { label: 'Selfie', url: resolveUrl(item.selfieUrl) },
-      { label: 'Selfie avec ID', url: resolveUrl(item.selfieWithIdUrl) }
-    ];
+      { label: 'CNI Recto', key: resolveUrl(item.documentFrontUrl) },
+      { label: 'CNI Verso', key: resolveUrl(item.documentBackUrl) },
+      { label: 'Selfie', key: resolveUrl(item.selfieUrl) },
+      { label: 'Selfie avec ID', key: resolveUrl(item.selfieWithIdUrl) }
+    ].map(d => ({ label: d.label, url: blobUrls[d.key] || d.key }));
 
     const isExpired = (dateStr) => {
       if (!dateStr) return false;
@@ -326,11 +340,13 @@ export default {
     };
 
     // Reset verification checklist checkboxes when selected client changes
-    watch(selectedKycId, () => {
+    watch(selectedKycId, (id) => {
       checklist.nameMatch = false;
       checklist.selfieMatch = false;
       checklist.cniLegible = false;
       checklist.cniValid = false;
+      const item = kycPending.value.find(k => k.id === id);
+      if (item) loadBlobs(item);
     });
 
     const filteredKyc = computed(() => {
