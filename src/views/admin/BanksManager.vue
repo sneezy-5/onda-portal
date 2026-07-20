@@ -113,6 +113,44 @@
                 </div>
               </div>
             </div>
+
+            <!-- Access Accounts Section -->
+            <div class="products-panel-header mt-8">
+              <h5><i class="fas fa-key"></i> Comptes d'accès au portail</h5>
+              <button @click="openUserDrawer(bank)" class="btn-add-product">
+                <i class="fas fa-user-plus"></i> Créer un accès
+              </button>
+            </div>
+
+            <div v-if="bankUsersLoading[bank.id]" class="products-empty">
+              <i class="fas fa-spinner fa-spin opacity-30"></i>
+              <span>Chargement des comptes...</span>
+            </div>
+            <div v-else-if="!bankUsersByBank[bank.id] || bankUsersByBank[bank.id].length === 0" class="products-empty">
+              <i class="fas fa-user-slash opacity-30"></i>
+              <span>Aucun compte de connexion pour cet établissement.</span>
+            </div>
+            <div v-else class="products-table">
+              <div v-for="account in bankUsersByBank[bank.id]" :key="account.id" class="product-row">
+                <div class="product-main-info">
+                  <span class="product-title">{{ account.firstName }} {{ account.lastName }}</span>
+                  <span class="product-desc">{{ account.email }}</span>
+                </div>
+                <div class="product-financials">
+                  <div class="fin-pill">
+                    <label>Rôle</label>
+                    <span>{{ account.role }}</span>
+                  </div>
+                  <div class="fin-pill">
+                    <label>Créé le</label>
+                    <span>{{ new Date(account.createdAt).toLocaleDateString('fr-FR') }}</span>
+                  </div>
+                </div>
+                <div :class="['status-badge', account.isActive ? 'status-active' : 'status-inactive']">
+                  {{ account.isActive ? 'Actif' : 'Inactif' }}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -339,6 +377,69 @@
       </div>
     </transition>
 
+    <!-- ============================
+         BANK ACCESS ACCOUNT DRAWER
+         ============================ -->
+    <transition name="drawer">
+      <div v-if="showUserDrawer" class="drawer-overlay" @click.self="closeUserDrawer">
+        <div class="drawer-panel">
+          <div class="drawer-header">
+            <div>
+              <h3>Créer un accès au portail</h3>
+              <p class="drawer-sub">{{ userTargetBank?.name }}</p>
+            </div>
+            <button @click="closeUserDrawer" class="drawer-close-btn"><i class="fas fa-times"></i></button>
+          </div>
+
+          <div class="drawer-body">
+            <form @submit.prevent="saveBankUser" class="form-elite">
+              <div class="form-grid-2">
+                <div class="field-group">
+                  <label>Prénom</label>
+                  <input v-model="userForm.firstName" type="text" placeholder="ex: Awa" />
+                </div>
+                <div class="field-group">
+                  <label>Nom</label>
+                  <input v-model="userForm.lastName" type="text" placeholder="ex: Koné" />
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label>Email <span class="required">*</span></label>
+                <input v-model="userForm.email" type="email" placeholder="contact@banque.ci" required />
+              </div>
+
+              <div class="field-group">
+                <label>Mot de passe <span class="required">*</span></label>
+                <div class="color-input-group">
+                  <input v-model="userForm.password" type="text" required class="color-text" />
+                  <button type="button" @click="generatePassword" class="btn-add-product" style="flex-shrink:0;">
+                    <i class="fas fa-sync-alt"></i> Régénérer
+                  </button>
+                </div>
+              </div>
+
+              <p class="text-muted" style="font-size:0.8rem;">
+                Les identifiants ci-dessus seront envoyés automatiquement à cette adresse email.
+              </p>
+
+              <div v-if="formError" class="form-error-banner">
+                <i class="fas fa-exclamation-circle"></i> {{ formError }}
+              </div>
+
+              <div class="drawer-footer">
+                <button type="button" @click="closeUserDrawer" class="btn-bo-secondary">Annuler</button>
+                <button type="submit" class="btn-bo-primary" :disabled="isSaving">
+                  <i class="fas" :class="isSaving ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
+                  {{ isSaving ? 'Création...' : 'Créer et envoyer' }}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <!-- Delete Confirm Dialog -->
     <transition name="fade-scale">
       <div v-if="deleteConfirm.show" class="confirm-overlay" @click.self="deleteConfirm.show = false">
@@ -454,6 +555,13 @@ export default {
       sortOrder: 1, validUntil: ''
     });
 
+    // Bank access accounts (portail banque)
+    const bankUsersByBank = reactive({});
+    const bankUsersLoading = reactive({});
+    const showUserDrawer = ref(false);
+    const userTargetBank = ref(null);
+    const userForm = reactive({ email: '', password: '', firstName: '', lastName: '' });
+
     // Delete confirm
     const deleteConfirm = reactive({
       show: false, title: '', message: '',
@@ -493,6 +601,62 @@ export default {
 
     const toggleExpand = (id) => {
       expandedBankId.value = expandedBankId.value === id ? null : id;
+      if (expandedBankId.value === id && !bankUsersByBank[id]) {
+        fetchBankUsers(id);
+      }
+    };
+
+    // ---- Comptes d'accès au portail banque ----
+    const fetchBankUsers = async (bankId) => {
+      bankUsersLoading[bankId] = true;
+      try {
+        const res = await adminApi.getBankUsers(bankId);
+        bankUsersByBank[bankId] = res.success ? res.data : [];
+      } catch {
+        bankUsersByBank[bankId] = [];
+      } finally {
+        bankUsersLoading[bankId] = false;
+      }
+    };
+
+    const generatePassword = () => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+      let pwd = '';
+      for (let i = 0; i < 14; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+      userForm.password = pwd;
+    };
+
+    const openUserDrawer = (bank) => {
+      userTargetBank.value = bank;
+      Object.assign(userForm, { email: '', password: '', firstName: '', lastName: '' });
+      generatePassword();
+      formError.value = '';
+      showUserDrawer.value = true;
+    };
+
+    const closeUserDrawer = () => {
+      showUserDrawer.value = false;
+      userTargetBank.value = null;
+    };
+
+    const saveBankUser = async () => {
+      isSaving.value = true;
+      formError.value = '';
+      const bankId = userTargetBank.value.id;
+      try {
+        const res = await adminApi.createBankUser(bankId, { ...userForm });
+        if (res.success) {
+          await fetchBankUsers(bankId);
+          closeUserDrawer();
+          showToast('Accès créé — les identifiants ont été envoyés par email.');
+        } else {
+          formError.value = res.message || 'Erreur lors de la création du compte.';
+        }
+      } catch (err) {
+        formError.value = err.message || 'Erreur lors de la création du compte.';
+      } finally {
+        isSaving.value = false;
+      }
     };
 
     // ---- Bank Drawer ----
@@ -688,9 +852,11 @@ export default {
       banks, isLoading, isSaving, expandedBankId, formError,
       showBankDrawer, editingBank, bankForm,
       showProductDrawer, editingProduct, productTargetBank, productForm,
+      bankUsersByBank, bankUsersLoading, showUserDrawer, userTargetBank, userForm,
       deleteConfirm, toast,
       toggleExpand, openBankDrawer, closeDrawer, saveBank, confirmDeleteBank,
       openProductDrawer, closeProductDrawer, saveProduct, confirmDeleteProduct,
+      openUserDrawer, closeUserDrawer, saveBankUser, generatePassword,
       executeDelete, formatAmount
     };
   }

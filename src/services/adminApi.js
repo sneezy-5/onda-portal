@@ -231,6 +231,23 @@ class AdminApiService {
     }
 
     // =========================================================
+    // Comptes d'accès au portail banque (/api/admin/banks/{bankId}/users)
+    // =========================================================
+
+    /** Liste les comptes de connexion d'un établissement bancaire */
+    async getBankUsers(bankId) {
+        return api.request(`/api/admin/banks/${bankId}/users`);
+    }
+
+    /** Crée un compte de connexion (email/mot de passe) pour un établissement bancaire */
+    async createBankUser(bankId, payload) {
+        return api.request(`/api/admin/banks/${bankId}/users`, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+    }
+
+    // =========================================================
     // CRUD Opportunités (/api/admin/opportunities)
     // =========================================================
 
