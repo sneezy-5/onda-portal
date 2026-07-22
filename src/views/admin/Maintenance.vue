@@ -129,6 +129,68 @@
       </section>
 
     </div>
+
+    <!-- Rattrapage Comptable : Solde d'Ouverture -->
+    <section class="maintenance-card card-premium mt-8">
+      <div class="card-header-bo">
+        <i class="fas fa-scale-balanced text-accent-gradient"></i>
+        <div>
+          <h4>Rattrapage Comptable — Solde d'Ouverture</h4>
+          <p>Corrige les comptes de trésorerie créés avant le fix : leur solde initial n'a jamais généré d'écritures au grand livre (Trésorerie faussée dans le Bilan).</p>
+        </div>
+      </div>
+
+      <div class="backfill-actions mt-6">
+        <button @click="runPreview" class="btn-trigger-cron" :disabled="backfillLoading">
+          <i v-if="backfillLoading === 'preview'" class="fas fa-spinner fa-spin"></i>
+          <i v-else class="fas fa-magnifying-glass"></i>
+          <span>{{ backfillLoading === 'preview' ? 'Analyse...' : "Lancer l'aperçu" }}</span>
+        </button>
+        <button
+          v-if="backfillResult"
+          @click="confirmApply"
+          class="btn-trigger-cron btn-apply-backfill"
+          :disabled="backfillLoading || backfillResult.matchedCount === 0"
+        >
+          <i v-if="backfillLoading === 'apply'" class="fas fa-spinner fa-spin"></i>
+          <i v-else class="fas fa-check"></i>
+          <span>{{ backfillLoading === 'apply' ? 'Application...' : `Appliquer (${backfillResult.matchedCount})` }}</span>
+        </button>
+      </div>
+
+      <div v-if="backfillResult" class="backfill-summary mt-6">
+        <div class="backfill-badge matched">{{ backfillResult.matchedCount }} corrigeables</div>
+        <div class="backfill-badge ambiguous">{{ backfillResult.ambiguousCount }} ambigus</div>
+        <div class="backfill-badge not-found">{{ backfillResult.noTransactionFoundCount }} sans transaction</div>
+        <div class="backfill-badge applied">{{ backfillResult.alreadyAppliedCount }} déjà à jour</div>
+        <div v-if="backfillResult.appliedCount" class="backfill-badge done">{{ backfillResult.appliedCount }} appliqués</div>
+      </div>
+
+      <div v-if="backfillResult && backfillResult.items.length" class="backfill-table-wrapper mt-4">
+        <table class="backfill-table">
+          <thead>
+            <tr>
+              <th>Organisation</th>
+              <th>Compte</th>
+              <th>Solde déclaré</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in backfillResult.items" :key="item.accountId">
+              <td>{{ item.organizationName }}</td>
+              <td>{{ item.accountLabel }}</td>
+              <td>{{ formatAmount(item.openingBalance) }}</td>
+              <td><span :class="['backfill-status-tag', statusClass(item.status)]">{{ statusLabel(item.status) }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div v-else-if="backfillResult" class="empty-terminal-state">
+        <p>Aucun compte à solde d'ouverture non nul n'a été trouvé.</p>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -285,6 +347,63 @@ export default {
       systemLogs.value = [];
     };
 
+    // --- Rattrapage comptable : Solde d'Ouverture ---
+    const backfillResult = ref(null);
+    const backfillLoading = ref(false);
+
+    const statusLabel = (status) => ({
+      MATCHED: 'Corrigeable',
+      AMBIGUOUS: 'Ambigu — revue manuelle',
+      NO_TRANSACTION_FOUND: 'Aucune transaction trouvée',
+      ALREADY_APPLIED: 'Déjà à jour'
+    }[status] || status);
+
+    const statusClass = (status) => ({
+      MATCHED: 'status-matched',
+      AMBIGUOUS: 'status-ambiguous',
+      NO_TRANSACTION_FOUND: 'status-not-found',
+      ALREADY_APPLIED: 'status-applied'
+    }[status] || '');
+
+    const formatAmount = (value) => {
+      if (value === null || value === undefined) return '—';
+      return new Intl.NumberFormat('fr-FR').format(value) + ' XOF';
+    };
+
+    const runPreview = async () => {
+      backfillLoading.value = 'preview';
+      try {
+        const response = await adminApi.previewOpeningBalanceBackfill();
+        backfillResult.value = response.data || response;
+      } catch (error) {
+        console.error('Échec de l\'aperçu du rattrapage', error);
+        alert(`Échec de l'aperçu : ${error.message || 'Serveur indisponible'}`);
+      } finally {
+        backfillLoading.value = false;
+      }
+    };
+
+    const confirmApply = async () => {
+      if (!backfillResult.value || backfillResult.value.matchedCount === 0) return;
+      const ok = confirm(
+        `Cela va comptabiliser le solde d'ouverture de ${backfillResult.value.matchedCount} compte(s) ` +
+        `(création d'écritures au grand livre, compte 101 Capital). Les comptes ambigus ou sans transaction ne seront pas touchés. Continuer ?`
+      );
+      if (!ok) return;
+
+      backfillLoading.value = 'apply';
+      try {
+        const response = await adminApi.applyOpeningBalanceBackfill();
+        backfillResult.value = response.data || response;
+        alert(`Rattrapage appliqué : ${backfillResult.value.appliedCount} compte(s) corrigé(s).`);
+      } catch (error) {
+        console.error('Échec de l\'application du rattrapage', error);
+        alert(`Échec de l'application : ${error.message || 'Serveur indisponible'}`);
+      } finally {
+        backfillLoading.value = false;
+      }
+    };
+
     const togglePause = () => {
       isPaused.value = !isPaused.value;
       if (!isPaused.value) {
@@ -317,9 +436,16 @@ export default {
       getServiceClass, 
       clearLogs, 
       togglePause, 
-      isPaused, 
+      isPaused,
       copyLogs,
-      consoleContainer
+      consoleContainer,
+      backfillResult,
+      backfillLoading,
+      statusLabel,
+      statusClass,
+      formatAmount,
+      runPreview,
+      confirmApply
     };
   }
 }
@@ -700,6 +826,81 @@ export default {
 .log-message {
   color: #cbd5e1;
 }
+
+/* Rattrapage comptable */
+.backfill-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-apply-backfill {
+  background: #166534;
+}
+
+.btn-apply-backfill:hover:not(:disabled) {
+  background: #14532d;
+}
+
+.backfill-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.backfill-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+}
+
+.backfill-badge.matched { background: #f0fdf4; color: #166534; }
+.backfill-badge.ambiguous { background: #fffbeb; color: #92400e; }
+.backfill-badge.not-found { background: #f8fafc; color: #475569; }
+.backfill-badge.applied { background: #eff6ff; color: #1e40af; }
+.backfill-badge.done { background: #ecfdf5; color: #065f46; }
+
+.backfill-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+}
+
+.backfill-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.backfill-table th {
+  background: var(--bg-surface-dim);
+  padding: 0.65rem 1rem;
+  font-size: 0.65rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.backfill-table td {
+  padding: 0.65rem 1rem;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-main);
+}
+
+.backfill-status-tag {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.35rem;
+  white-space: nowrap;
+}
+
+.status-matched { background: #f0fdf4; color: #166534; }
+.status-ambiguous { background: #fffbeb; color: #92400e; }
+.status-not-found { background: #f8fafc; color: #475569; }
+.status-applied { background: #eff6ff; color: #1e40af; }
 
 @media (max-width: 1024px) {
   .system-metrics-grid {

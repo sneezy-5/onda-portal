@@ -107,6 +107,13 @@
             <td>
               <div class="actions-cell">
                 <button
+                  class="action-btn btn-view-finances"
+                  @click="openFinanceModal(org)"
+                  title="Voir états financiers & score de crédit"
+                >
+                  <i class="fas fa-chart-pie"></i>
+                </button>
+                <button
                   v-if="org.isActive !== false"
                   class="action-btn btn-suspend"
                   @click="openSuspendModal(org)"
@@ -187,6 +194,120 @@
         </div>
       </div>
     </div>
+
+    <!-- Finance & Score Modal -->
+    <div v-if="financeModal.show" class="modal-backdrop" @click.self="financeModal.show = false">
+      <div class="premium-modal-large finance-modal animate-slide-up">
+        <div class="finance-modal-header">
+          <div>
+            <h3>{{ financeModal.org?.name }}</h3>
+            <p class="text-muted text-sm mt-1">États financiers OHADA (année en cours) & score de crédit</p>
+          </div>
+          <button class="btn-close" @click="financeModal.show = false"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div v-if="financeModal.loading" class="loading-state">
+          <div class="spinner-elite"></div>
+          <p class="text-muted mt-4">Chargement des données financières...</p>
+        </div>
+
+        <div v-else class="finance-modal-body">
+          <div v-if="financeModal.error" class="finance-error">
+            <i class="fas fa-triangle-exclamation"></i> {{ financeModal.error }}
+          </div>
+
+          <template v-else>
+            <!-- Score de crédit -->
+            <section class="finance-section" v-if="financeModal.score">
+              <div class="score-header">
+                <div class="score-badge">
+                  <span class="score-value">{{ financeModal.score.totalScore }}</span>
+                  <span class="score-max">/ {{ financeModal.score.maxScore }}</span>
+                </div>
+                <div class="score-meta">
+                  <span class="score-label">{{ financeModal.score.labelFr }}</span>
+                  <span class="score-tier">Tier {{ financeModal.score.tierLabel }}</span>
+                </div>
+                <div v-if="financeModal.score.hasLoanDelinquency" class="score-delinquency">
+                  <i class="fas fa-triangle-exclamation"></i> Retard de remboursement détecté
+                </div>
+              </div>
+              <div class="score-stats-grid">
+                <div class="score-stat">
+                  <span class="stat-label">CA moyen mensuel</span>
+                  <span class="stat-value">{{ formatAmount(financeModal.score.avgMonthlyRevenue) }}</span>
+                </div>
+                <div class="score-stat">
+                  <span class="stat-label">Patrimoine net certifié</span>
+                  <span class="stat-value">{{ formatAmount(financeModal.score.netPatrimonyValue) }}</span>
+                </div>
+                <div class="score-stat">
+                  <span class="stat-label">Jours actifs (30j)</span>
+                  <span class="stat-value">{{ financeModal.score.activeDaysLast30 }}</span>
+                </div>
+                <div class="score-stat">
+                  <span class="stat-label">Déclarations vérifiées (12M)</span>
+                  <span class="stat-value">{{ financeModal.score.verifiedDeclarationsLast12M }}/{{ financeModal.score.dueDeclarationsLast12M }}</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Bilan -->
+            <section class="finance-section" v-if="financeModal.statements">
+              <h4 class="finance-section-title"><i class="fas fa-scale-balanced"></i> Bilan ({{ financeModal.statements.period }})</h4>
+              <div class="finance-columns">
+                <div class="finance-column">
+                  <h5>Actif</h5>
+                  <div class="finance-row"><span>Immobilisations</span><strong>{{ formatAmount(financeModal.statements.balanceSheet.immobilisations) }}</strong></div>
+                  <div class="finance-row"><span>Stocks</span><strong>{{ formatAmount(financeModal.statements.balanceSheet.stocks) }}</strong></div>
+                  <div class="finance-row"><span>Créances clients</span><strong>{{ formatAmount(financeModal.statements.balanceSheet.receivables) }}</strong></div>
+                  <div class="finance-row"><span>Trésorerie</span><strong>{{ formatAmount(financeModal.statements.balanceSheet.cashAndBank) }}</strong></div>
+                  <div class="finance-row finance-row-total"><span>Total Actif</span><strong>{{ formatAmount(financeModal.statements.balanceSheet.totalAssets) }}</strong></div>
+                </div>
+                <div class="finance-column">
+                  <h5>Passif</h5>
+                  <div class="finance-row"><span>Capitaux propres</span><strong>{{ formatAmount(financeModal.statements.balanceSheet.equity) }}</strong></div>
+                  <div class="finance-row"><span>Dettes financières</span><strong>{{ formatAmount(financeModal.statements.balanceSheet.financialDebts) }}</strong></div>
+                  <div class="finance-row"><span>Fournisseurs</span><strong>{{ formatAmount(financeModal.statements.balanceSheet.payables) }}</strong></div>
+                  <div class="finance-row"><span>Dettes fiscales & sociales</span><strong>{{ formatAmount(financeModal.statements.balanceSheet.taxLiabilities) }}</strong></div>
+                  <div class="finance-row"><span>Autres dettes</span><strong>{{ formatAmount(financeModal.statements.balanceSheet.otherLiabilities) }}</strong></div>
+                  <div class="finance-row finance-row-total"><span>Total Passif</span><strong>{{ formatAmount(financeModal.statements.balanceSheet.totalLiabilities) }}</strong></div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Compte de Résultat -->
+            <section class="finance-section" v-if="financeModal.statements">
+              <h4 class="finance-section-title"><i class="fas fa-file-invoice-dollar"></i> Compte de Résultat</h4>
+              <div class="finance-columns">
+                <div class="finance-column">
+                  <h5>Produits</h5>
+                  <div class="finance-row"><span>Ventes de marchandises</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.salesRevenue) }}</strong></div>
+                  <div class="finance-row"><span>Prestations de services</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.servicesRevenue) }}</strong></div>
+                  <div class="finance-row"><span>Autres produits</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.otherRevenue) }}</strong></div>
+                  <div class="finance-row finance-row-total"><span>Total Produits</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.totalRevenue) }}</strong></div>
+                </div>
+                <div class="finance-column">
+                  <h5>Charges</h5>
+                  <div class="finance-row"><span>Achats de marchandises</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.costOfGoodsSold) }}</strong></div>
+                  <div class="finance-row"><span>Services extérieurs</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.externalServices) }}</strong></div>
+                  <div class="finance-row"><span>Charges de personnel</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.personnelExpenses) }}</strong></div>
+                  <div class="finance-row"><span>Impôts et taxes</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.taxesAndDuties) }}</strong></div>
+                  <div class="finance-row"><span>Charges financières</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.financialExpenses) }}</strong></div>
+                  <div class="finance-row"><span>Autres charges</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.otherExpenses) }}</strong></div>
+                  <div class="finance-row finance-row-total"><span>Total Charges</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.totalExpense) }}</strong></div>
+                </div>
+              </div>
+              <div class="finance-results">
+                <div class="finance-result-item"><span>Marge brute</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.grossProfit) }}</strong></div>
+                <div class="finance-result-item"><span>Résultat d'exploitation</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.operatingIncome) }}</strong></div>
+                <div class="finance-result-item finance-result-net"><span>Résultat net</span><strong>{{ formatAmount(financeModal.statements.incomeStatement.netIncome) }}</strong></div>
+              </div>
+            </section>
+          </template>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -210,6 +331,9 @@ export default {
 
     // Suspend Modal state
     const suspendModal = ref({ show: false, target: null, reason: '' });
+
+    // Finance & Score Modal state — chargé à la demande (pas au chargement de la liste)
+    const financeModal = ref({ show: false, org: null, loading: false, error: null, score: null, statements: null });
 
     // Pagination State
     const currentPage = ref(1);
@@ -314,6 +438,28 @@ export default {
       }
     };
 
+    const formatAmount = (value) => {
+      if (value === null || value === undefined) return '—';
+      return new Intl.NumberFormat('fr-FR').format(value) + ' XOF';
+    };
+
+    const openFinanceModal = async (org) => {
+      financeModal.value = { show: true, org, loading: true, error: null, score: null, statements: null };
+      try {
+        const [scoreRes, statementsRes] = await Promise.all([
+          adminApi.getClientScore(org.id),
+          adminApi.getClientFinancialStatements(org.id)
+        ]);
+        financeModal.value.score = scoreRes.data || scoreRes;
+        financeModal.value.statements = statementsRes.data || statementsRes;
+      } catch (e) {
+        console.error('Error fetching org financial data:', e);
+        financeModal.value.error = e.message || 'Impossible de charger les données financières.';
+      } finally {
+        financeModal.value.loading = false;
+      }
+    };
+
     onMounted(() => {
       fetchPartnerDetails();
       fetchOrganizations();
@@ -326,6 +472,7 @@ export default {
       selectedCountry,
       actionLoading,
       suspendModal,
+      financeModal,
       currentPage,
       pageSize,
       totalPages,
@@ -337,7 +484,9 @@ export default {
       onFilterChange,
       openSuspendModal,
       handleConfirmSuspend,
-      handleActivateOrganization
+      handleActivateOrganization,
+      openFinanceModal,
+      formatAmount
     };
   }
 };
@@ -623,6 +772,16 @@ export default {
   transform: scale(1.05);
 }
 
+.btn-view-finances {
+  background: rgba(14, 165, 233, 0.1);
+  color: #0284c7;
+}
+
+.btn-view-finances:hover {
+  background: rgba(14, 165, 233, 0.2);
+  transform: scale(1.05);
+}
+
 /* Row suspended style */
 .row-suspended td {
   opacity: 0.65;
@@ -825,6 +984,240 @@ export default {
   }
   .filters-group {
     justify-content: space-between;
+  }
+}
+
+/* Finance & Score Modal */
+.premium-modal-large {
+  background: white;
+  border-radius: 1.5rem;
+  padding: 2rem;
+  width: 95%;
+  max-width: 900px;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  animation: modal-in 0.2s ease;
+}
+
+.finance-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.finance-modal-header h3 {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: var(--text-main);
+}
+
+.finance-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.finance-error {
+  background: rgba(244, 63, 94, 0.08);
+  color: #be123c;
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.finance-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-bottom: 1rem;
+}
+
+.finance-section-title i {
+  color: var(--accent);
+}
+
+/* Score */
+.score-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.score-badge {
+  background: var(--bg-surface-inverse);
+  color: white;
+  border-radius: 1rem;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.score-value {
+  font-size: 1.75rem;
+  font-weight: 900;
+}
+
+.score-max {
+  font-size: 0.9rem;
+  opacity: 0.7;
+  font-weight: 700;
+}
+
+.score-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.score-label {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--text-main);
+}
+
+.score-tier {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.score-delinquency {
+  background: rgba(244, 63, 94, 0.1);
+  color: #be123c;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.score-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.score-stat {
+  background: var(--bg-surface-dim);
+  border-radius: 0.75rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.score-stat .stat-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.score-stat .stat-value {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+/* Bilan / Compte de résultat */
+.finance-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.finance-column h5 {
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.finance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.85rem;
+}
+
+.finance-row span {
+  color: var(--text-muted);
+}
+
+.finance-row strong {
+  color: var(--text-main);
+  font-weight: 800;
+}
+
+.finance-row-total {
+  border-bottom: none;
+  border-top: 2px solid var(--border-strong);
+  margin-top: 0.25rem;
+  padding-top: 0.65rem;
+}
+
+.finance-row-total span,
+.finance-row-total strong {
+  color: var(--text-main);
+  font-weight: 900;
+}
+
+.finance-results {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+
+.finance-result-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.finance-result-item span {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.finance-result-item strong {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: var(--text-main);
+}
+
+.finance-result-net strong {
+  color: #10b981;
+}
+
+@media (max-width: 640px) {
+  .finance-columns {
+    grid-template-columns: 1fr;
   }
 }
 </style>

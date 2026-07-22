@@ -399,6 +399,40 @@ class AdminApiService {
             method: 'PATCH'
         });
     }
+
+    // =========================================================
+    // Rattrapage comptable — Solde d'Ouverture (/api/admin/accounting)
+    // =========================================================
+
+    /** Aperçu en lecture seule des comptes dont le solde d'ouverture manque au grand livre. */
+    async previewOpeningBalanceBackfill() {
+        return api.request('/api/admin/accounting/opening-balance-backfill/preview');
+    }
+
+    /** Applique le rattrapage pour les comptes sans ambiguïté (MATCHED). */
+    async applyOpeningBalanceBackfill() {
+        return api.request('/api/admin/accounting/opening-balance-backfill/apply', {
+            method: 'POST'
+        });
+    }
+
+    // =========================================================
+    // Vue financière d'une organisation (/api/admin/clients/{id})
+    // =========================================================
+
+    /** États financiers OHADA (Bilan + Compte de Résultat) d'une organisation. */
+    async getClientFinancialStatements(orgId, params = {}) {
+        const qs = new URLSearchParams();
+        if (params.from) qs.append('from', params.from);
+        if (params.to) qs.append('to', params.to);
+        const s = qs.toString();
+        return api.request(`/api/admin/clients/${orgId}/financial-statements${s ? '?' + s : ''}`);
+    }
+
+    /** Score de crédit / bancabilité actuel d'une organisation. */
+    async getClientScore(orgId) {
+        return api.request(`/api/admin/clients/${orgId}/score`);
+    }
 }
 
 export default new AdminApiService();
