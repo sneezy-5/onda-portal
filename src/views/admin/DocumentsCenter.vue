@@ -71,6 +71,10 @@
           <p>{{ selected.organizationName }}<span v-if="selected.partnerName"> — via {{ selected.partnerName }}</span></p>
           <p>Statut : {{ selected.verificationStatus }}</p>
           <p class="dc-file">{{ selected.filename }} · {{ selected.contentType }}</p>
+          <div v-if="canAudit(selected)" class="dc-actions">
+            <button class="btn ok" @click="approve(selected)" :disabled="busy === selected.fileId">✓ Approuver</button>
+            <button class="btn ko" @click="reject(selected)" :disabled="busy === selected.fileId">✕ Rejeter</button>
+          </div>
         </div>
       </div>
     </div>
@@ -85,7 +89,12 @@ const docs = ref([]);
 const images = reactive({});   // fileId -> objectURL
 const loading = ref(false);
 const selected = ref(null);
+const busy = ref(null);
 const filters = reactive({ category: 'ALL', source: 'ALL', status: 'ALL', env: 'all' });
+
+// Seules les preuves bancaires (BANQUE) sont câblées ici ; KYC/conformité/équipement
+// ont déjà leur propre écran de revue dédié (KycQueue, PatrimonyQueue).
+const canAudit = (d) => d && d.category === 'BANQUE' && !['VERIFIED', 'CERTIFIED', 'REJECTED'].includes(d.verificationStatus);
 
 const statusClass = (s) => {
   if (!s) return '';
@@ -119,6 +128,28 @@ const load = async () => {
 };
 
 const preview = (d) => { selected.value = d; };
+
+const approve = async (d) => {
+  busy.value = d.fileId;
+  try {
+    await adminApi.approveDocument(d.fileId, 'Vérifié manuellement', d.environment);
+    d.verificationStatus = 'VERIFIED';
+    selected.value = null;
+  } catch (e) { alert('Échec approbation : ' + e.message); }
+  finally { busy.value = null; }
+};
+
+const reject = async (d) => {
+  const reason = prompt('Motif du rejet ?', 'Preuve non conforme');
+  if (reason === null) return;
+  busy.value = d.fileId;
+  try {
+    await adminApi.rejectDocument(d.fileId, reason, d.environment);
+    d.verificationStatus = 'REJECTED';
+    selected.value = null;
+  } catch (e) { alert('Échec rejet : ' + e.message); }
+  finally { busy.value = null; }
+};
 
 onMounted(load);
 onBeforeUnmount(revokeAll);
@@ -166,4 +197,9 @@ onBeforeUnmount(revokeAll);
 .dc-modal-info { padding: 16px; }
 .dc-modal-info p { margin: 4px 0; font-size: 14px; }
 .dc-file { color: #6b7280; font-size: 12px; }
+.dc-actions { display: flex; gap: 10px; margin-top: 14px; }
+.dc-actions .btn { border: none; padding: 10px 18px; border-radius: 10px; cursor: pointer; font-weight: 800; font-size: 13px; }
+.dc-actions .btn.ok { background: #16a34a; color: #fff; }
+.dc-actions .btn.ko { background: #fee2e2; color: #b91c1c; }
+.dc-actions .btn:disabled { opacity: .6; cursor: default; }
 </style>

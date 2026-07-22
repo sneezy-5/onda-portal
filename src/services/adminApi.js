@@ -21,6 +21,20 @@ class AdminApiService {
         return api.request(`/api/admin/documents${s ? '?' + s : ''}`);
     }
 
+    /** Approuve un justificatif (ex: preuve bancaire) directement depuis le centre de documents. */
+    async approveDocument(fileId, notes = '', env = 'production') {
+        return api.request(`/api/admin/documents/${fileId}/approve?notes=${encodeURIComponent(notes)}&env=${encodeURIComponent(env)}`, {
+            method: 'POST'
+        });
+    }
+
+    /** Rejette un justificatif (ex: preuve bancaire) directement depuis le centre de documents. */
+    async rejectDocument(fileId, notes = '', env = 'production') {
+        return api.request(`/api/admin/documents/${fileId}/reject?notes=${encodeURIComponent(notes)}&env=${encodeURIComponent(env)}`, {
+            method: 'POST'
+        });
+    }
+
     /**
      * Charge une image protégée (nécessite le token admin) et renvoie une object-URL
      * utilisable dans <img :src>. À révoquer avec URL.revokeObjectURL après usage.
