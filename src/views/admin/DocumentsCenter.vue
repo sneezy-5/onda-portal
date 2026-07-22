@@ -56,6 +56,9 @@
           </div>
           <div class="dc-org">{{ d.organizationName || '—' }}</div>
           <div v-if="d.partnerName" class="dc-partner">via {{ d.partnerName }}</div>
+          <div v-if="d.category === 'BANQUE'" class="dc-account">
+            🏦 {{ d.accountLabel || 'Compte inconnu' }}<span v-if="d.accountNumber"> · {{ d.accountNumber }}</span>
+          </div>
           <div class="dc-status" :class="statusClass(d.verificationStatus)">{{ d.verificationStatus }}</div>
         </div>
       </div>
@@ -71,6 +74,15 @@
           <p>{{ selected.organizationName }}<span v-if="selected.partnerName"> — via {{ selected.partnerName }}</span></p>
           <p>Statut : {{ selected.verificationStatus }}</p>
           <p class="dc-file">{{ selected.filename }} · {{ selected.contentType }}</p>
+
+          <div v-if="selected.category === 'BANQUE'" class="dc-account-box">
+            <p class="dc-account-title">🏦 Compte concerné</p>
+            <p><b>{{ selected.accountLabel || 'Compte inconnu' }}</b><span v-if="selected.accountNumber"> · {{ selected.accountNumber }}</span></p>
+            <p v-if="selected.accountChannel">Canal : {{ selected.accountChannel }}<span v-if="selected.accountProvider"> ({{ selected.accountProvider }})</span></p>
+            <p v-if="selected.accountBalance !== null && selected.accountBalance !== undefined">Solde système : {{ formatAmount(selected.accountBalance) }}</p>
+            <p>Statut du compte : <span class="dc-status" :class="statusClass(selected.accountVerificationStatus)">{{ selected.accountVerificationStatus || '—' }}</span></p>
+          </div>
+
           <div v-if="canAudit(selected)" class="dc-actions">
             <button class="btn ok" @click="approve(selected)" :disabled="busy === selected.fileId">✓ Approuver</button>
             <button class="btn ko" @click="reject(selected)" :disabled="busy === selected.fileId">✕ Rejeter</button>
@@ -96,10 +108,13 @@ const filters = reactive({ category: 'ALL', source: 'ALL', status: 'ALL', env: '
 // ont déjà leur propre écran de revue dédié (KycQueue, PatrimonyQueue).
 const canAudit = (d) => d && d.category === 'BANQUE' && !['VERIFIED', 'CERTIFIED', 'REJECTED'].includes(d.verificationStatus);
 
+const formatAmount = (a) => a != null ? Number(a).toLocaleString('fr-FR') + ' FCFA' : '—';
+
 const statusClass = (s) => {
   if (!s) return '';
-  if (['CERTIFIED', 'VERIFIED'].includes(s)) return 'ok';
-  if (['REJECTED', 'SUSPICIOUS'].includes(s)) return 'ko';
+  // Couvre aussi PROOF_CERTIFIED (statut compte) en plus de CERTIFIED/VERIFIED (statut fichier).
+  if (s.includes('CERTIFIED') || s === 'VERIFIED') return 'ok';
+  if (s.includes('REJECTED') || s === 'SUSPICIOUS') return 'ko';
   return 'wait';
 };
 
@@ -134,6 +149,7 @@ const approve = async (d) => {
   try {
     await adminApi.approveDocument(d.fileId, 'Vérifié manuellement', d.environment);
     d.verificationStatus = 'VERIFIED';
+    d.accountVerificationStatus = 'PROOF_CERTIFIED';
     selected.value = null;
   } catch (e) { alert('Échec approbation : ' + e.message); }
   finally { busy.value = null; }
@@ -146,6 +162,7 @@ const reject = async (d) => {
   try {
     await adminApi.rejectDocument(d.fileId, reason, d.environment);
     d.verificationStatus = 'REJECTED';
+    d.accountVerificationStatus = 'REJECTED';
     selected.value = null;
   } catch (e) { alert('Échec rejet : ' + e.message); }
   finally { busy.value = null; }
@@ -185,6 +202,7 @@ onBeforeUnmount(revokeAll);
 .badge.env { background: #fef3c7; color: #b45309; }
 .dc-org { font-weight: 700; font-size: 14px; color: #111827; }
 .dc-partner { font-size: 11px; color: #6b7280; margin-top: 2px; }
+.dc-account { font-size: 11px; color: #1d4ed8; margin-top: 4px; font-weight: 600; }
 .dc-status { margin-top: 8px; font-size: 11px; font-weight: 700; display: inline-block; padding: 2px 8px; border-radius: 6px; background: #f3f4f6; color: #374151; }
 .dc-status.ok { background: #dcfce7; color: #15803d; }
 .dc-status.ko { background: #fee2e2; color: #b91c1c; }
@@ -197,6 +215,8 @@ onBeforeUnmount(revokeAll);
 .dc-modal-info { padding: 16px; }
 .dc-modal-info p { margin: 4px 0; font-size: 14px; }
 .dc-file { color: #6b7280; font-size: 12px; }
+.dc-account-box { margin-top: 12px; padding: 12px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; }
+.dc-account-title { font-weight: 800; color: #1d4ed8; margin-bottom: 6px !important; }
 .dc-actions { display: flex; gap: 10px; margin-top: 14px; }
 .dc-actions .btn { border: none; padding: 10px 18px; border-radius: 10px; cursor: pointer; font-weight: 800; font-size: 13px; }
 .dc-actions .btn.ok { background: #16a34a; color: #fff; }
