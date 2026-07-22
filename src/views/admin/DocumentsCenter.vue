@@ -5,7 +5,10 @@
         <h1>Centre de documents</h1>
         <p class="dc-sub">Toutes les preuves (KYC, conformité, équipement, banque) — partenaires &amp; mobile</p>
       </div>
-      <button class="dc-refresh" @click="load" :disabled="loading">↻ Actualiser</button>
+      <div style="display:flex; gap:8px;">
+        <button class="dc-refresh dc-backfill" @click="runBackfill" :disabled="backfillBusy">🔧 Rattraper preuves orphelines</button>
+        <button class="dc-refresh" @click="load" :disabled="loading">↻ Actualiser</button>
+      </div>
     </div>
 
     <!-- Filtres -->
@@ -102,6 +105,7 @@ const images = reactive({});   // fileId -> objectURL
 const loading = ref(false);
 const selected = ref(null);
 const busy = ref(null);
+const backfillBusy = ref(false);
 const filters = reactive({ category: 'ALL', source: 'ALL', status: 'ALL', env: 'all' });
 
 // Seules les preuves bancaires (BANQUE) sont câblées ici ; KYC/conformité/équipement
@@ -168,6 +172,35 @@ const reject = async (d) => {
   finally { busy.value = null; }
 };
 
+const runBackfill = async () => {
+  const targetEnv = filters.env && filters.env !== 'all' ? filters.env : 'production';
+  backfillBusy.value = true;
+  try {
+    const previewRes = await adminApi.previewBankProofBackfill(targetEnv);
+    const preview = previewRes.data || previewRes;
+    if (!preview.linked && !preview.resynced) {
+      alert(`Rien à rattraper (env : ${targetEnv}).`);
+      return;
+    }
+    const ok = confirm(
+      `Rattrapage preuves bancaires (env : ${targetEnv})\n` +
+      `• ${preview.linked} fichier(s) à relier à leur compte\n` +
+      `• ${preview.resynced} compte(s) à resynchroniser (notif + webhook envoyés)\n` +
+      (preview.conflict ? `• ${preview.conflict} conflit(s) ignoré(s) (déjà liés à un autre compte)\n` : '') +
+      `\nAppliquer ?`
+    );
+    if (!ok) return;
+    const applyRes = await adminApi.applyBankProofBackfill(targetEnv);
+    const applied = applyRes.data || applyRes;
+    alert(`Terminé : ${applied.linked} relié(s), ${applied.resynced} resynchronisé(s).`);
+    await load();
+  } catch (e) {
+    alert('Échec du rattrapage : ' + e.message);
+  } finally {
+    backfillBusy.value = false;
+  }
+};
+
 onMounted(load);
 onBeforeUnmount(revokeAll);
 </script>
@@ -178,6 +211,8 @@ onBeforeUnmount(revokeAll);
 .dc-header h1 { font-size: 22px; font-weight: 800; margin: 0; }
 .dc-sub { color: #6b7280; font-size: 13px; margin-top: 4px; }
 .dc-refresh { background: #111827; color: #fff; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.dc-refresh.dc-backfill { background: #7c3aed; }
+.dc-refresh:disabled { opacity: .6; cursor: default; }
 .dc-filters { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
 .dc-filters select { padding: 8px 12px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; font-size: 13px; }
 .dc-count { color: #6b7280; font-size: 13px; margin-left: auto; }

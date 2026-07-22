@@ -36,6 +36,20 @@ class AdminApiService {
     }
 
     /**
+     * Rattrapage : preuves bancaires uploadées avant le fix du lien fichier→compte,
+     * restées orphelines (impossible à rattacher à un compte pour auditer).
+     */
+    async previewBankProofBackfill(env = 'production') {
+        return api.request(`/api/admin/documents/bank-proof-backfill/preview?env=${encodeURIComponent(env)}`);
+    }
+
+    async applyBankProofBackfill(env = 'production') {
+        return api.request(`/api/admin/documents/bank-proof-backfill/apply?env=${encodeURIComponent(env)}`, {
+            method: 'POST'
+        });
+    }
+
+    /**
      * Charge une image protégée (nécessite le token admin) et renvoie une object-URL
      * utilisable dans <img :src>. À révoquer avec URL.revokeObjectURL après usage.
      */
