@@ -163,6 +163,8 @@
         <div class="backfill-badge ambiguous">{{ backfillResult.ambiguousCount }} ambigus</div>
         <div class="backfill-badge not-found">{{ backfillResult.noTransactionFoundCount }} sans transaction</div>
         <div class="backfill-badge applied">{{ backfillResult.alreadyAppliedCount }} déjà à jour</div>
+        <div v-if="backfillResult.periodClosedCount" class="backfill-badge period-closed">{{ backfillResult.periodClosedCount }} période clôturée</div>
+        <div v-if="backfillResult.errorCount" class="backfill-badge error">{{ backfillResult.errorCount }} en erreur</div>
         <div v-if="backfillResult.appliedCount" class="backfill-badge done">{{ backfillResult.appliedCount }} appliqués</div>
       </div>
 
@@ -181,7 +183,10 @@
               <td>{{ item.organizationName }}</td>
               <td>{{ item.accountLabel }}</td>
               <td>{{ formatAmount(item.openingBalance) }}</td>
-              <td><span :class="['backfill-status-tag', statusClass(item.status)]">{{ statusLabel(item.status) }}</span></td>
+              <td>
+                <span :class="['backfill-status-tag', statusClass(item.status)]">{{ statusLabel(item.status) }}</span>
+                <div v-if="item.note" class="backfill-status-note" :title="item.note">{{ item.note }}</div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -355,14 +360,18 @@ export default {
       MATCHED: 'Corrigeable',
       AMBIGUOUS: 'Ambigu — revue manuelle',
       NO_TRANSACTION_FOUND: 'Aucune transaction trouvée',
-      ALREADY_APPLIED: 'Déjà à jour'
+      ALREADY_APPLIED: 'Déjà à jour',
+      PERIOD_CLOSED: 'Période comptable clôturée',
+      ERROR: 'Erreur'
     }[status] || status);
 
     const statusClass = (status) => ({
       MATCHED: 'status-matched',
       AMBIGUOUS: 'status-ambiguous',
       NO_TRANSACTION_FOUND: 'status-not-found',
-      ALREADY_APPLIED: 'status-applied'
+      ALREADY_APPLIED: 'status-applied',
+      PERIOD_CLOSED: 'status-period-closed',
+      ERROR: 'status-error'
     }[status] || '');
 
     const formatAmount = (value) => {
@@ -858,6 +867,8 @@ export default {
 .backfill-badge.ambiguous { background: #fffbeb; color: #92400e; }
 .backfill-badge.not-found { background: #f8fafc; color: #475569; }
 .backfill-badge.applied { background: #eff6ff; color: #1e40af; }
+.backfill-badge.period-closed { background: #fff7ed; color: #9a3412; }
+.backfill-badge.error { background: rgba(244, 63, 94, 0.1); color: #be123c; }
 .backfill-badge.done { background: #ecfdf5; color: #065f46; }
 
 .backfill-table-wrapper {
@@ -897,10 +908,22 @@ export default {
   white-space: nowrap;
 }
 
+.backfill-status-note {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.3rem;
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .status-matched { background: #f0fdf4; color: #166534; }
 .status-ambiguous { background: #fffbeb; color: #92400e; }
 .status-not-found { background: #f8fafc; color: #475569; }
 .status-applied { background: #eff6ff; color: #1e40af; }
+.status-period-closed { background: #fff7ed; color: #9a3412; }
+.status-error { background: rgba(244, 63, 94, 0.1); color: #be123c; }
 
 @media (max-width: 1024px) {
   .system-metrics-grid {
